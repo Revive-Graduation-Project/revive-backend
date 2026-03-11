@@ -1,0 +1,80 @@
+package com.restaurant.auth.service;
+
+import com.restaurant.auth.config.RabbitMQConfig;
+import com.restaurant.auth.domain.entity.User;
+import com.restaurant.auth.dto.AuthRequest;
+import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.SignupRequest;
+import com.restaurant.auth.event.UserCreatedEvent;
+import com.restaurant.auth.exception.EmailAlreadyExistsException;
+import com.restaurant.auth.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository        userRepository;
+    private final PasswordEncoder       passwordEncoder;
+    private final JwtService            jwtService;
+    private final AuthenticationManager authenticationManager;
+    private final RabbitTemplate        rabbitTemplate;
+
+    // ── Signup ────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public AuthResponse signup(SignupRequest request) {
+        // 1. Guard: reject duplicate emails
+        if (userRepository.existsByEmail(request.email())) {
+            throw new EmailAlreadyExistsException(request.email());
+        }
+
+        // 2. Persist the new user with a hashed password
+        User user = User.builder()
+                .email(request.email())
+                .password(passwordEncoder.encode(request.password()))
+                .role(request.role())
+                .isActive(true)
+                .build();
+
+        user = userRepository.save(user);
+        log.info("User created: id={}, role={}", user.getId(), user.getRole());
+
+        // 3. Publish UserCreatedEvent to the shared exchange
+        UserCreatedEvent event = new UserCreatedEvent(user.getId(), user.getRole().name());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_CREATED,
+                event);
+        log.info("Published UserCreatedEvent for userId={}", user.getId());
+
+        // 4. Return a JWT so the client is immediately authenticated
+        return new AuthResponse(jwtService.generateToken(user));
+    }
+
+    // ── Login ─────────────────────────────────────────────────────────────────
+
+    public AuthResponse login(AuthRequest request) {
+        // Delegates credential validation to DaoAuthenticationProvider.
+        // The first argument is the email — Spring's internal parameter is named
+        // "username" but here it holds the email value as the principal identifier.
+        // Throws BadCredentialsException automatically on failure.
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new IllegalStateException(
+                        "User authenticated but not found — this should never happen"));
+
+        log.info("User logged in: id={}", user.getId());
+        return new AuthResponse(jwtService.generateToken(user));
+    }
+}
