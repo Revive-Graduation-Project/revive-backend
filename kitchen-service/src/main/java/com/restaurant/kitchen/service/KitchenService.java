@@ -1,15 +1,21 @@
 package com.restaurant.kitchen.service;
 
 import com.restaurant.kitchen.entity.ChefProfile;
+import com.restaurant.kitchen.enums.ChefStatus;
+import com.restaurant.kitchen.enums.Station;
 import com.restaurant.kitchen.events.ProfileCreationFailedEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
+import com.restaurant.kitchen.exception.ChefNotFoundException;
 import com.restaurant.kitchen.mapper.ChefProfileMapper;
 import com.restaurant.kitchen.repository.ChefProfileRepository;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.Map;
 import java.util.Optional;
@@ -115,5 +121,34 @@ public class KitchenService {
 
             throw publishException; //message process failed so spring nack and re-queue it or push it to dlq
         }
+    }
+
+    private ChefProfile findChef(Long id) {
+
+        return chefProfileRepository.findById(id)
+                .orElseThrow(() -> new ChefNotFoundException(id));
+
+    }
+
+    public void updateDisplayName(Long id, String displayName) {
+
+        ChefProfile retrievedChef = findChef(id);
+        retrievedChef.setDisplayName(displayName);
+        chefProfileRepository.save(retrievedChef);
+    }
+
+    public void updateStation(Long id, Station station) {
+
+        ChefProfile retrievedChef = findChef(id);
+        retrievedChef.setStation(station);
+        chefProfileRepository.save(retrievedChef);
+
+    }
+
+    public void updateStatus(Long id, ChefStatus status) {
+
+        ChefProfile retrievedChef = findChef(id);
+        retrievedChef.setStatus(status);
+        chefProfileRepository.save(retrievedChef);
     }
 }

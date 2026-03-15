@@ -1,8 +1,11 @@
 package com.restaurant.kitchen.service;
 
 import com.restaurant.kitchen.entity.ChefProfile;
+import com.restaurant.kitchen.enums.ChefStatus;
+import com.restaurant.kitchen.enums.Station;
 import com.restaurant.kitchen.events.ProfileCreationFailedEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
+import com.restaurant.kitchen.exception.ChefNotFoundException;
 import com.restaurant.kitchen.mapper.ChefProfileMapper;
 import com.restaurant.kitchen.repository.ChefProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +21,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -138,5 +143,101 @@ class KitchenServiceTest {
                 eq("chef-profile.failed"),
                 any(),
                 any(MessagePostProcessor.class));
+    }
+
+
+    // ── updateDisplayName ────────────────────────────────────────────────
+    @Test
+    void shouldUpdateDisplayNameSuccessfully() {
+        // Arrange
+        ChefProfile chef = new ChefProfile();
+        chef.setDisplayName("OldName");
+
+        when(chefProfileRepository.findById(1L))
+                .thenReturn(Optional.of(chef));
+
+        // Act
+        kitchenService.updateDisplayName(1L, "NewName");
+
+        // Assert
+        assertEquals("NewName", chef.getDisplayName());
+        verify(chefProfileRepository).save(chef);
+    }
+
+    @Test
+    void shouldThrowChefNotFoundWhenUpdatingDisplayNameOfNonExistentChef() {
+        // Arrange
+        when(chefProfileRepository.findById(99L))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ChefNotFoundException.class,
+                () -> kitchenService.updateDisplayName(99L, "NewName"));
+
+        verify(chefProfileRepository, never()).save(any());
+    }
+
+    // ── updateStation ────────────────────────────────────────────────────
+
+    @Test
+    void shouldUpdateStationSuccessfully() {
+        // Arrange
+        ChefProfile chef = new ChefProfile();
+        chef.setStation(Station.GRILL);
+
+        when(chefProfileRepository.findById(1L))
+                .thenReturn(Optional.of(chef));
+
+        // Act
+        kitchenService.updateStation(1L, Station.FRY);
+
+        // Assert
+        assertEquals(Station.FRY, chef.getStation());
+        verify(chefProfileRepository).save(chef);
+    }
+
+    @Test
+    void shouldThrowChefNotFoundWhenUpdatingStationOfNonExistentChef() {
+        // Arrange
+        when(chefProfileRepository.findById(99L))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ChefNotFoundException.class,
+                () -> kitchenService.updateStation(99L, Station.GRILL));
+
+        verify(chefProfileRepository, never()).save(any());
+    }
+
+    // ── updateStatus ─────────────────────────────────────────────────────
+
+    @Test
+    void shouldUpdateStatusSuccessfully() {
+        // Arrange
+        ChefProfile chef = new ChefProfile();
+        chef.setStatus(ChefStatus.ACTIVE);
+
+        when(chefProfileRepository.findById(1L))
+                .thenReturn(Optional.of(chef));
+
+        // Act
+        kitchenService.updateStatus(1L, ChefStatus.INACTIVE);
+
+        // Assert
+        assertEquals(ChefStatus.INACTIVE, chef.getStatus());
+        verify(chefProfileRepository).save(chef);
+    }
+
+    @Test
+    void shouldThrowChefNotFoundWhenUpdatingStatusOfNonExistentChef() {
+        // Arrange
+        when(chefProfileRepository.findById(99L))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ChefNotFoundException.class,
+                () -> kitchenService.updateStatus(99L, ChefStatus.INACTIVE));
+
+        verify(chefProfileRepository, never()).save(any());
     }
 }

@@ -15,7 +15,7 @@ public class RabbitMQConsumer {
 
     private final KitchenService service;
 
-    @RabbitListener(queues = "${app.rabbitmq.queues.created-user.name}")
+    @RabbitListener(queues = "${app.rabbitmq.queues.user-created.name}")
     public void handleUserCreated(UserCreatedEvent event, @Header(value = "correlationId", required = false) String correlationId,
                                   @Header(value = "sagaId", required = false) String sagaId) {
         if (sagaId == null || correlationId == null) {

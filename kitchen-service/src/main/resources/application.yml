@@ -1,9 +1,36 @@
-spring:
-  application:
-    name: kitchen-service
+#spring:
+#  application:
+#    name: kitchen-service
+#
+#  datasource:
+#    url: jdbc:postgresql://kitchen-db:5432/kitchen_db
+#    username: postgres
+#    password: postgres
+#    driver-class-name: org.postgresql.Driver
+#
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#    show-sql: true
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.PostgreSQLDialect
+#        format_sql: true
+#
+#  rabbitmq:
+#    host: rabbitmq
+#    port: 5672
+#    username: guest
+#    password: guest
+#
+#server:
+#  port: 8080
+#
 
+# Local configuration to prevent rebuilding bulky docker containers constantly
+spring:
   datasource:
-    url: jdbc:postgresql://kitchen-db:5432/kitchen_db
+    url: jdbc:postgresql://localhost:5436/kitchen_db
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -14,18 +41,18 @@ spring:
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
   rabbitmq:
-    host: rabbitmq
+    host: localhost
     port: 5672
     username: guest
     password: guest
 
 server:
-  port: 8080
+  port: 8086
 
+# rabbitmq properties
 app:
   rabbitmq:
     exchange: restaurant.events.exchange

@@ -14,5 +14,13 @@
 	<artifactId>kitchen-service</artifactId>
 	<name>kitchen-service</name>
 	<description>Kitchen order management service</description>
+    <dependencies>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>RELEASE</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
 
 </project>
