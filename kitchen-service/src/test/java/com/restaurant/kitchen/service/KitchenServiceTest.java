@@ -221,7 +221,7 @@ class KitchenServiceTest {
                 .thenReturn(Optional.of(chef));
 
         // Act
-        kitchenService.updateStatus(1L, ChefStatus.INACTIVE);
+        kitchenService.updateChefStatus(1L, ChefStatus.INACTIVE);
 
         // Assert
         assertEquals(ChefStatus.INACTIVE, chef.getStatus());
@@ -236,7 +236,7 @@ class KitchenServiceTest {
 
         // Act & Assert
         assertThrows(ChefNotFoundException.class,
-                () -> kitchenService.updateStatus(99L, ChefStatus.INACTIVE));
+                () -> kitchenService.updateChefStatus(99L, ChefStatus.INACTIVE));
 
         verify(chefProfileRepository, never()).save(any());
     }

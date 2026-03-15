@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // // 404 — chef not found
+    // 404 — chef not found
     @ExceptionHandler(ChefNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleChefNotFound(ChefNotFoundException e) {
 
@@ -27,6 +27,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(error);
+    }
+
+    // 404 — ticket not found
+    @ExceptionHandler(TicketNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTicketNotFound(TicketNotFoundException e) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(e.getMessage(), LocalDateTime.now().toString()));
     }
 
     // 403 - X-User-Role is forbidden

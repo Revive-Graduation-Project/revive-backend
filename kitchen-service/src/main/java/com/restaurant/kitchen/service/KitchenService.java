@@ -1,24 +1,32 @@
 package com.restaurant.kitchen.service;
 
+import com.restaurant.kitchen.dto.KitchenTicketDTO;
 import com.restaurant.kitchen.entity.ChefProfile;
+import com.restaurant.kitchen.entity.KitchenTicket;
 import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;
+import com.restaurant.kitchen.enums.TicketStatus;
 import com.restaurant.kitchen.events.ProfileCreationFailedEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
 import com.restaurant.kitchen.exception.ChefNotFoundException;
+import com.restaurant.kitchen.exception.TicketNotFoundException;
 import com.restaurant.kitchen.mapper.ChefProfileMapper;
+import com.restaurant.kitchen.mapper.KitchenTicketMapper;
 import com.restaurant.kitchen.repository.ChefProfileRepository;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.restaurant.kitchen.repository.KitchenTicketRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +34,13 @@ import java.util.Optional;
 public class KitchenService {
 
     private final RabbitTemplate rabbitTemplate;
+
     private final ChefProfileRepository chefProfileRepository;
-    private final ChefProfileMapper mapper;
+    private final KitchenTicketRepository kitchenTicketRepository;
+
+    private final ChefProfileMapper chefMapper;
+    private final KitchenTicketMapper ticketMapper;
+
 
     @Value("${app.rabbitmq.exchange}")
     private String exchange;
@@ -60,7 +73,7 @@ public class KitchenService {
 
         try {
 
-            ChefProfile chef = chefProfileRepository.save(mapper.toEntity(event));
+            ChefProfile chef = chefProfileRepository.save(chefMapper.toEntity(event));
 
             publishChefCreatedEvent(chef, headers);
 
@@ -81,7 +94,7 @@ public class KitchenService {
             rabbitTemplate.convertAndSend(
                     exchange,
                     "chef-profile.created",
-                    mapper.toProfileCreatedEvent(chef),
+                    chefMapper.toProfileCreatedEvent(chef),
                     message -> {
                         message.getMessageProperties().getHeaders().putAll(headers);
                         return message;
@@ -100,7 +113,7 @@ public class KitchenService {
                                                 Map<String, String> headers) {
 
         ProfileCreationFailedEvent failedEvent =
-                mapper.toProfileCreationFailedEvent(event);
+                chefMapper.toProfileCreationFailedEvent(event);
 
         failedEvent.setReason(reason);
 
@@ -145,10 +158,50 @@ public class KitchenService {
 
     }
 
-    public void updateStatus(Long id, ChefStatus status) {
+    public void updateChefStatus(Long id, ChefStatus status) {
 
         ChefProfile retrievedChef = findChef(id);
         retrievedChef.setStatus(status);
         chefProfileRepository.save(retrievedChef);
+    }
+
+    @Transactional //both of updating db and publishing event must success
+    public void updateTicketStatus(Long id, TicketStatus status) {
+
+        KitchenTicket retrievedTicket = kitchenTicketRepository.findById(id)
+                .orElseThrow(() -> new TicketNotFoundException(id));
+        retrievedTicket.setStatus(status);
+        kitchenTicketRepository.save(retrievedTicket);
+
+        if (status.equals(TicketStatus.READY)) {
+
+            Map<String, String> headers = Map.of(
+                    "sagaId", UUID.randomUUID().toString(),
+                    "correlationId", UUID.randomUUID().toString()
+            );
+
+            try {
+                rabbitTemplate.convertAndSend(exchange, "ticket.ready",
+                        ticketMapper.toTicketReadyEvent(retrievedTicket),
+                        message -> {
+                            message.getMessageProperties().getHeaders().putAll(headers);
+                            return message;
+                        }
+                );
+                log.info("Event published for ticket {}", id);
+            } catch (Exception e) {
+                log.error("Failed to publish event for ticket {}", id, e);
+                throw new RuntimeException(); // triggers @Transactional rollback. global handler will catch it
+            }
+        }
+    }
+
+    public List<KitchenTicketDTO> getActiveTickets() {
+        List<KitchenTicket> activeTickets = kitchenTicketRepository.findByStatusNot(TicketStatus.READY);
+
+        if (activeTickets.isEmpty())
+            throw new TicketNotFoundException(null);
+
+        return ticketMapper.toDTOList(activeTickets);
     }
 }

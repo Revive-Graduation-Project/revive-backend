@@ -2,7 +2,7 @@ package com.restaurant.kitchen.controller;
 
 import com.restaurant.kitchen.dto.UpdateDisplayNameRequest;
 import com.restaurant.kitchen.dto.UpdateStationRequest;
-import com.restaurant.kitchen.dto.UpdateStatusRequest;
+import com.restaurant.kitchen.dto.UpdateChefStatusRequest;
 import com.restaurant.kitchen.exception.ForbiddenRoleException;
 import com.restaurant.kitchen.service.KitchenService;
 import jakarta.validation.Valid;
@@ -47,10 +47,10 @@ public class AdminController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateStatus(@PathVariable Long id,
                                              @RequestHeader("X-User-Role") String userRole,
-                                             @Valid @RequestBody UpdateStatusRequest statusRequest) {
+                                             @Valid @RequestBody UpdateChefStatusRequest statusRequest) {
 
         validateAdminRole(userRole);
-        service.updateStatus(id, statusRequest.status());
+        service.updateChefStatus(id, statusRequest.status());
         return ResponseEntity.ok().build();
     }
 }
