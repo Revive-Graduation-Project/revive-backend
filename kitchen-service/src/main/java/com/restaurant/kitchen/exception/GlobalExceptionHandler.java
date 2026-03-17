@@ -6,17 +6,32 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    // 404 — accessed endpoint does not exist
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFoundEndpoint(NoResourceFoundException e) {
+
+        ErrorResponse error = new ErrorResponse(
+                "Endpoint " + e.getHttpMethod() + " /" + e.getResourcePath() + " not found",
+                LocalDateTime.now().toString()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(error);
+    }
 
     // 404 — chef not found
     @ExceptionHandler(ChefNotFoundException.class)
@@ -75,9 +90,9 @@ public class GlobalExceptionHandler {
         String message = e.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(FieldError::getDefaultMessage)  // gets message from annotation
+                .map(error -> Objects.requireNonNullElse(error.getDefaultMessage(), "Validation error"))  // gets message from annotation
                 .findFirst()
-                .orElse("Validation error");
+                .get(); // used get() because message will never be empty
 
         ErrorResponse error = new ErrorResponse(message, LocalDateTime.now().toString());
         return ResponseEntity
@@ -109,6 +124,5 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(error);
     }
-
 
 }
