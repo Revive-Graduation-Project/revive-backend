@@ -48,11 +48,24 @@ spring:
     port: 5672
     username: guest
     password: guest
+    listener:
+      simple:
+        retry:
+          # 1. Enable local retries inside the app
+          enabled: true
+          # 2. Maximum number of attempts (including the first one)
+          max-attempts: 3
+          # 3. Wait time between retries (e.g., 2 seconds)
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+        # after the last retry. This triggers the move to DLQ.
+        default-requeue-rejected: false
 
 server:
   port: 8086
 
-# rabbitmq properties
+# queues declaration
 app:
   rabbitmq:
     exchange: restaurant.events.exchange

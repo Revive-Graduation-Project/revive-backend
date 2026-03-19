@@ -37,7 +37,6 @@ public class AdminController {
     public ResponseEntity<Void> updateStation(@PathVariable Long id,
                                               @RequestHeader("X-User-Role") String userRole,
                                               @Valid @RequestBody UpdateStationRequest stationRequest) {
-
         validateAdminRole(userRole);
         service.updateStation(id, stationRequest.station());
         return ResponseEntity.ok().build();
@@ -47,7 +46,6 @@ public class AdminController {
     public ResponseEntity<Void> updateStatus(@PathVariable Long id,
                                              @RequestHeader("X-User-Role") String userRole,
                                              @Valid @RequestBody UpdateChefStatusRequest statusRequest) {
-
         validateAdminRole(userRole);
         service.updateChefStatus(id, statusRequest.status());
         return ResponseEntity.ok().build();

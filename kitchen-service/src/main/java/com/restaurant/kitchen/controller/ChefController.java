@@ -40,6 +40,4 @@ public class ChefController {
         return ResponseEntity.ok(activeTickets);
     }
 
-
-
 }

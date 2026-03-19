@@ -111,7 +111,6 @@ public class GlobalExceptionHandler {
                 .body(error);
     }
 
-
     // fallback — anything unexpected
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception e) {
@@ -124,5 +123,4 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(error);
     }
-
 }

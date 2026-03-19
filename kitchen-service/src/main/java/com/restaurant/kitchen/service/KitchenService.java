@@ -6,12 +6,14 @@ import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;
 import com.restaurant.kitchen.enums.TicketStatus;
 
-import org.springframework.transaction.annotation.Transactional;
+import com.restaurant.kitchen.events.UserCreatedEvent;
 
 import java.util.List;
 
 
 public interface KitchenService {
+
+    void createChefProfile(UserCreatedEvent event, String correlationId, String sagaId);
 
     void updateDisplayName(Long id, String displayName);
 
@@ -19,9 +21,7 @@ public interface KitchenService {
 
     void updateChefStatus(Long id, ChefStatus status);
 
-    @Transactional //both of updating db and publishing event must success
     void updateTicketStatus(Long id, TicketStatus status);
 
     List<KitchenTicketDTO> getActiveTickets();
-
 }
