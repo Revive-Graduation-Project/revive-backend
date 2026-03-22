@@ -14,7 +14,6 @@ import org.mapstruct.Mapping;
  */
 @Mapper(componentModel = "spring")
 public interface UserMapper {
-
     /**
      * Maps a {@link SignupRequest} to a {@link User} entity.
      * {@code email} is auto-mapped by name. Password hashing and role
