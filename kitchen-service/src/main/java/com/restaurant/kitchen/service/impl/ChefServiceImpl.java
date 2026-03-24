@@ -1,46 +1,35 @@
-package com.restaurant.kitchen.service;
+package com.restaurant.kitchen.service.impl;
 
-import com.restaurant.kitchen.dto.KitchenTicketDTO;
 import com.restaurant.kitchen.entity.ChefProfile;
-import com.restaurant.kitchen.entity.KitchenTicket;
 import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;
-import com.restaurant.kitchen.enums.TicketStatus;
 import com.restaurant.kitchen.events.UserCreatedEvent;
 import com.restaurant.kitchen.exception.ChefNotFoundException;
-import com.restaurant.kitchen.exception.TicketNotFoundException;
 import com.restaurant.kitchen.mapper.ChefProfileMapper;
-import com.restaurant.kitchen.mapper.KitchenTicketMapper;
 import com.restaurant.kitchen.messaging.MessagePublisher;
 import com.restaurant.kitchen.repository.ChefProfileRepository;
-import com.restaurant.kitchen.repository.KitchenTicketRepository;
+import com.restaurant.kitchen.service.ChefService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class KitchenServiceImpl implements KitchenService {
+@Transactional(rollbackFor = Exception.class)
+public class ChefServiceImpl implements ChefService {
 
     private final MessagePublisher publisher;
-
     private final ChefProfileRepository chefProfileRepository;
-    private final KitchenTicketRepository kitchenTicketRepository;
-
-    private final KitchenTicketMapper ticketMapper;
     private final ChefProfileMapper chefMapper;
 
-    @Transactional(rollbackFor = Exception.class)
     @Override
     public void createChefProfile(UserCreatedEvent event, String correlationId, String sagaId) {
 
-        log.info("Received userCreated event: {} , sagaID: {} , correlationID {}", event, sagaId, correlationId);
+        log.info("Received user.created event: {} , sagaID: {} , correlationID {}", event, sagaId, correlationId);
 
         if (!"CHEF".equals(event.getRole())) {
             log.info("Ignoring non-chef user: {}", event.getAuthUserId());
@@ -50,6 +39,7 @@ public class KitchenServiceImpl implements KitchenService {
         Optional<ChefProfile> existingChef =
                 chefProfileRepository.findByAuthUserId(event.getAuthUserId());
 
+        // Idempotency check
         if (existingChef.isPresent()) {
 
             log.info("Chef already exists, re-publishing creation event. userId: {}", event.getAuthUserId());
@@ -82,19 +72,21 @@ public class KitchenServiceImpl implements KitchenService {
     }
 
     @Override
-    public void updateDisplayName(Long id, String displayName) {
+    public void updateChefDisplayName(Long id, String displayName) {
 
         ChefProfile retrievedChef = findChef(id);
         retrievedChef.setDisplayName(displayName.trim());
-        chefProfileRepository.save(retrievedChef);
+        // no need to re-save cause transactional triggers dirty checking
+        // which auto updates DB entries automatically when object state change is detected
     }
 
     @Override
-    public void updateStation(Long id, Station station) {
+    public void updateChefStation(Long id, Station station) {
 
         ChefProfile retrievedChef = findChef(id);
         retrievedChef.setStation(station);
-        chefProfileRepository.save(retrievedChef);
+        // no need to re-save cause transactional triggers dirty checking
+        // which auto updates DB entries automatically when object state change is detected
     }
 
     @Override
@@ -102,33 +94,7 @@ public class KitchenServiceImpl implements KitchenService {
 
         ChefProfile retrievedChef = findChef(id);
         retrievedChef.setStatus(status);
-        chefProfileRepository.save(retrievedChef);
-    }
-
-    @Transactional(rollbackFor = Exception.class) //both of updating db and publishing event must success
-    @Override
-    public void updateTicketStatus(Long id, TicketStatus status) {
-
-        KitchenTicket retrievedTicket = kitchenTicketRepository.findById(id)
-                .orElseThrow(() -> new TicketNotFoundException(id));
-        retrievedTicket.setStatus(status);
-        kitchenTicketRepository.save(retrievedTicket);
-
-        if (status.equals(TicketStatus.READY))
-            publisher.publishTicketReady(
-                    id,
-                    ticketMapper.toTicketReadyEvent(retrievedTicket),
-                    UUID.randomUUID().toString(),
-                    UUID.randomUUID().toString());
-    }
-
-    @Override
-    public List<KitchenTicketDTO> getActiveTickets() {
-        List<KitchenTicket> activeTickets = kitchenTicketRepository.findByStatusNot(TicketStatus.READY);
-
-        if (activeTickets.isEmpty())
-            throw new TicketNotFoundException(null);
-
-        return ticketMapper.toDTOList(activeTickets);
+        // no need to re-save cause transactional triggers dirty checking
+        // which auto updates DB entries automatically when object state change is detected
     }
 }

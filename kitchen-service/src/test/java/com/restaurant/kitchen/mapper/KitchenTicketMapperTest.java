@@ -1,13 +1,15 @@
 package com.restaurant.kitchen.mapper;
 
+import com.restaurant.kitchen.dto.KitchenTicketDTO;
 import com.restaurant.kitchen.entity.ChefProfile;
 import com.restaurant.kitchen.entity.KitchenTicket;
-import com.restaurant.kitchen.events.TicketReadyEvent;
+import com.restaurant.kitchen.events.ticketEvents.TicketReadyEvent;
 import com.restaurant.kitchen.enums.TicketStatus;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,6 +49,14 @@ class KitchenTicketMapperTest {
         TicketReadyEvent event = mapper.toTicketReadyEvent(null);
 
         assertThat(event).isNull();
+    }
+
+    @Test
+    void shouldReturnEmptyKitchenTicketDTOListWhenKitchenTicketListIsEmpty() {
+
+        List<KitchenTicketDTO> ticketDTOs = mapper.toDTOList(List.of());
+
+        assertThat(ticketDTOs).isEqualTo(List.of());
     }
 
     // ─── helper ───────────────────────────────────────────────────────────────

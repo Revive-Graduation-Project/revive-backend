@@ -16,12 +16,31 @@
 #      hibernate:
 #        dialect: org.hibernate.dialect.PostgreSQLDialect
 #        format_sql: true
+
+#  security:
+#    oauth2:
+#      resourceserver:
+#        jwt:
+#          issuer-uri: http://auth-service:8080
 #
 #  rabbitmq:
 #    host: rabbitmq
 #    port: 5672
 #    username: guest
 #    password: guest
+#    listener:
+#      simple:
+#        retry:
+#          # 1. Enable local retries inside the app
+#          enabled: true
+#          # 2. Maximum number of attempts (including the first one)
+#          max-attempts: 3
+#          # 3. Wait time between retries (e.g., 2 seconds)
+#          initial-interval: 2000ms
+#          multiplier: 2.0
+#          max-interval: 10000ms
+#        # after the last retry. This triggers the move to DLQ.
+#        default-requeue-rejected: false
 #
 #server:
 #  port: 8080
@@ -42,6 +61,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081
 
   rabbitmq:
     host: localhost
@@ -73,7 +98,12 @@ app:
       user-created:
         name: user.created.queue
         routing-key: user.created
-
+        #////
         dlq-name: user.created.queue.dlq
         dlq-routing-key: user.created.dlq
-
+      order-created:
+        name: order.created.queue
+        routing-key: order.created
+        #////
+        dlq-name: order.created.queue.dlq
+        dlq-routing-key: order.created.dlq

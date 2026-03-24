@@ -16,6 +16,7 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.exchange}")
     private String exchange;
 
+    // user.created event
     @Value("${app.rabbitmq.queues.user-created.name}")
     private String userCreatedQueue;
 
@@ -28,6 +29,20 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.queues.user-created.dlq-routing-key}")
     private String userCreatedDLQRoutingKey;
 
+    // order.created event
+    @Value("${app.rabbitmq.queues.order-created.name}")
+    private String orderCreatedQueue;
+
+    @Value("${app.rabbitmq.queues.order-created.routing-key}")
+    private String orderCreatedRoutingKey;
+
+    @Value("${app.rabbitmq.queues.order-created.dlq-name}")
+    private String orderCreatedDLQName;
+
+    @Value("${app.rabbitmq.queues.order-created.dlq-routing-key}")
+    private String orderCreatedDLQRoutingKey;
+
+
     // --------- Converter & Template ----------
     @Bean
     public MessageConverter converter() {
@@ -35,7 +50,7 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public AmqpTemplate amqpTemplate(ConnectionFactory connectionFactory) {
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
         rabbitTemplate.setMessageConverter(converter());
         return rabbitTemplate;
@@ -62,6 +77,20 @@ public class RabbitMQConfig {
         return new Queue(userCreatedDLQName, true);
     }
 
+    @Bean
+    public Queue orderCreatedQueue() {
+        return QueueBuilder.durable(orderCreatedQueue)   // durable queue
+                .withArgument("x-dead-letter-exchange", exchange) // DLX
+                .withArgument("x-dead-letter-routing-key", orderCreatedDLQRoutingKey) // DLQ routing key
+                .withArgument("x-message-ttl", 30000) // TTL 30s
+                .build();
+    }
+
+    @Bean
+    public Queue orderCreatedDLQ() {
+        return new Queue(orderCreatedDLQName, true);
+    }
+
     // --------- Bindings ----------
     @Bean
     public Binding bindingUserCreatedQueue() {
@@ -77,5 +106,21 @@ public class RabbitMQConfig {
                 .bind(userCreatedDLQ())
                 .to(restaurantExchange())
                 .with(userCreatedDLQRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingOrderCreatedQueue() {
+        return BindingBuilder
+                .bind(orderCreatedQueue())
+                .to(restaurantExchange())
+                .with(orderCreatedRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingOrderCreatedDLQ() {
+        return BindingBuilder
+                .bind(orderCreatedDLQ())
+                .to(restaurantExchange())
+                .with(orderCreatedDLQRoutingKey);
     }
 }

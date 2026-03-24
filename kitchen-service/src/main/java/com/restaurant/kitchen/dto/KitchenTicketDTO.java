@@ -9,5 +9,4 @@ public record KitchenTicketDTO(
         TicketStatus status ,
         String chefDisplayName,
         LocalDateTime createdAt
-) {
-}
+) {}

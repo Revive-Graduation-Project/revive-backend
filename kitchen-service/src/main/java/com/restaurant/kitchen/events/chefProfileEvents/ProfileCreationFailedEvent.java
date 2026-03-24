@@ -1,4 +1,4 @@
-package com.restaurant.kitchen.events;
+package com.restaurant.kitchen.events.chefProfileEvents;
 
 import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;

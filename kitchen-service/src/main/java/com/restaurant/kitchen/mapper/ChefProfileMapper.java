@@ -1,8 +1,8 @@
 package com.restaurant.kitchen.mapper;
 
 import com.restaurant.kitchen.entity.ChefProfile;
-import com.restaurant.kitchen.events.ProfileCreatedEvent;
-import com.restaurant.kitchen.events.ProfileCreationFailedEvent;
+import com.restaurant.kitchen.events.chefProfileEvents.ProfileCreatedEvent;
+import com.restaurant.kitchen.events.chefProfileEvents.ProfileCreationFailedEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

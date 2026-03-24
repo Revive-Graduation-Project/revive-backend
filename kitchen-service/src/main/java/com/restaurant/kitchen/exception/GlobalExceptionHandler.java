@@ -6,13 +6,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 @RestControllerAdvice
@@ -24,8 +25,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNotFoundEndpoint(NoResourceFoundException e) {
 
         ErrorResponse error = new ErrorResponse(
-                "Endpoint " + e.getHttpMethod() + " /" + e.getResourcePath() + " not found",
-                LocalDateTime.now().toString()
+                "Endpoint /" + e.getResourcePath() + " not found",
+                Instant.now()
         );
 
         return ResponseEntity
@@ -33,11 +34,27 @@ public class GlobalExceptionHandler {
                 .body(error);
     }
 
+    // 405 unsupported HTTP method
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+
+        ErrorResponse error = new ErrorResponse(
+                "Method '" + e.getMethod()
+                        + "' is not supported for this endpoint. Supported methods: "
+                        + e.getSupportedHttpMethods(),
+                Instant.now()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.METHOD_NOT_ALLOWED) // 405
+                .body(error);
+    }
+
     // 404 — chef not found
     @ExceptionHandler(ChefNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleChefNotFound(ChefNotFoundException e) {
 
-        ErrorResponse error = new ErrorResponse(e.getMessage(), LocalDateTime.now().toString());
+        ErrorResponse error = new ErrorResponse(e.getMessage(), Instant.now());
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
@@ -49,22 +66,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTicketNotFound(TicketNotFoundException e) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse(e.getMessage(), LocalDateTime.now().toString()));
-    }
-
-    // 403 - X-User-Role is forbidden
-    @ExceptionHandler(ForbiddenRoleException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenial(ForbiddenRoleException e) {
-        return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse(e.getMessage(), LocalDateTime.now().toString()));
+                .body(new ErrorResponse(e.getMessage(), Instant.now()));
     }
 
     // 409 — duplicate unique field
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException e) {
 
-        ErrorResponse error = new ErrorResponse("Resource already exists", LocalDateTime.now().toString());
+        ErrorResponse error = new ErrorResponse("Resource already exists", Instant.now());
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
@@ -76,7 +85,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataAccess(DataAccessException e) {
         log.error("Database error", e);
 
-        ErrorResponse error = new ErrorResponse("A database error occurred", LocalDateTime.now().toString());
+        ErrorResponse error = new ErrorResponse("A database error occurred", Instant.now());
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -94,7 +103,7 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .get(); // used get() because message will never be empty
 
-        ErrorResponse error = new ErrorResponse(message, LocalDateTime.now().toString());
+        ErrorResponse error = new ErrorResponse(message, Instant.now());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(error);
@@ -104,7 +113,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleInvalidFormat(HttpMessageNotReadableException e) {
 
-        ErrorResponse error = new ErrorResponse("Invalid value provided", LocalDateTime.now().toString());
+        ErrorResponse error = new ErrorResponse("Invalid value provided", Instant.now());
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -117,7 +126,9 @@ public class GlobalExceptionHandler {
 
         log.error("Unexpected error", e);
 
-        ErrorResponse error = new ErrorResponse("Internal server error", LocalDateTime.now().toString());
+        ErrorResponse error = new ErrorResponse(
+                "An unexpected internal server error occurred. Please try again later."
+                , Instant.now());
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
