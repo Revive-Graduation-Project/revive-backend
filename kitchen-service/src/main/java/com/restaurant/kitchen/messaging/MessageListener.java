@@ -4,8 +4,6 @@ import com.restaurant.kitchen.events.OrderCreatedEvent;
 import com.restaurant.kitchen.events.chefProfileEvents.ProfileCreationFailedEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
 import com.restaurant.kitchen.events.ticketEvents.TicketCreationFailedEvent;
-import com.restaurant.kitchen.mapper.ChefProfileMapper;
-import com.restaurant.kitchen.mapper.KitchenTicketMapper;
 import com.restaurant.kitchen.service.ChefService;
 import com.restaurant.kitchen.service.TicketService;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +20,6 @@ public class MessageListener {
 
     private final ChefService chefService;
     private final TicketService ticketService;
-    private final ChefProfileMapper chefMapper;
-    private final KitchenTicketMapper ticketMapper;
 
     private final MessagePublisher publisher;
 
@@ -44,12 +40,14 @@ public class MessageListener {
                                      @Header("sagaId") String sagaId,
                                      @Header("correlationId") String correlationId) {
 
-        log.error("Message moved to DLQ after max retries. Sending final failure event for user: {}", event.getAuthUserId());
+        log.error("Message moved to DLQ after max retries. Sending final failure event for user: {}", event.getId());
 
         try {
 
-            ProfileCreationFailedEvent failedEvent = chefMapper.toProfileCreationFailedEvent(event);
-            failedEvent.setReason("Chef profile creation failed due to technical error after multiple retries");
+            ProfileCreationFailedEvent failedEvent = new ProfileCreationFailedEvent(
+                    event.getId(),
+                    "Chef profile creation failed due to technical error after multiple retries"
+            );
             publisher.publishChefFailed(failedEvent, sagaId, correlationId);
 
         } catch (Exception e) {
@@ -81,12 +79,14 @@ public class MessageListener {
                                      @Header("sagaId") String sagaId,
                                      @Header("correlationId") String correlationId) {
 
-        log.error("Message moved to DLQ after max retries. Sending final failure event for order: {}", event.getOrderId());
+        log.error("Message moved to DLQ after max retries. Sending final failure event for order: {}", event.getId());
 
         try {
 
-            TicketCreationFailedEvent failedEvent = ticketMapper.toTicketCreationFailedEvent(event);
-            failedEvent.setReason("Kitchen ticket creation failed due to technical error after multiple retries");
+            TicketCreationFailedEvent failedEvent = new TicketCreationFailedEvent(
+                    event.getId(),
+                    "Kitchen ticket creation failed due to technical error after multiple retries"
+            );
             publisher.publishTicketFailed(failedEvent, sagaId, correlationId);
 
         } catch (Exception e) {

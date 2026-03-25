@@ -258,18 +258,6 @@ services:
       - restaurant-net
 
 
-  rabbitmq:
-    image: rabbitmq:4.2.4-management-alpine
-    container_name: rabbitmq
-    platform: linux/amd64
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - restaurant-net
-
   # ─────────────────────────────────────────────
   # Next.js Frontend / AI Proxy  (disabled — uncomment when ready)
   # ─────────────────────────────────────────────

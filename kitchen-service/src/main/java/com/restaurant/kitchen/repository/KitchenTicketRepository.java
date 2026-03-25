@@ -1,6 +1,5 @@
 package com.restaurant.kitchen.repository;
 
-import com.restaurant.kitchen.entity.ChefProfile;
 import com.restaurant.kitchen.entity.KitchenTicket;
 import com.restaurant.kitchen.enums.TicketStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,5 +13,4 @@ public interface KitchenTicketRepository extends JpaRepository<KitchenTicket, Lo
 
    List<KitchenTicket> findByStatusNot(TicketStatus status); // search for active tickets
    Optional<KitchenTicket> findByOrderId(Long orderId);
-   int countByAssignedChefAndStatusNot(ChefProfile chef, TicketStatus ticketStatus);
 }

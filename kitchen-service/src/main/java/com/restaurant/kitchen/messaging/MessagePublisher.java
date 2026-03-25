@@ -24,26 +24,26 @@ public class MessagePublisher {
     private String exchange;
 
     public void publishChefCreated(ProfileCreatedEvent event, String sagaId, String correlationId) {
-        send("chef-profile.created", event, sagaId, correlationId);
+        send("chef.profile.created", event, sagaId, correlationId);
     }
 
     public void publishChefFailed(ProfileCreationFailedEvent event, String sagaId, String correlationId) {
-        send("chef-profile.failed", event, sagaId, correlationId);
+        send("chef.profile.failed", event, sagaId, correlationId);
     }
 
     public void publishTicketCreated(TicketCreatedEvent event, String sagaId, String correlationId) {
         send("ticket.created", event, sagaId, correlationId);
-        log.info("Ticket created event published for ticket {} to order {}", event.getTicketId() , event.getOrderId());
+        log.info("Ticket created event published for order {} . ticket id: {}", event.getId() , event.getTicketId());
     }
 
     public void publishTicketFailed(TicketCreationFailedEvent event, String sagaId, String correlationId) {
         send("ticket.failed", event, sagaId, correlationId);
-        log.info("Ticket creation failed Event published for order {}", event.getOrderId());
+        log.info("Ticket creation failed Event published for order {}", event.getId());
     }
 
     public void publishTicketReady(TicketReadyEvent event, String correlationId) {
         send("ticket.ready", event, null, correlationId); // simple point-to-point communication no saga needed
-        log.info("Ticket ready event published for ticket {} to order {}", event.getTicketId() , event.getOrderId());
+        log.info("Ticket ready event published for order {} . ticket id: {}", event.getId() , event.getTicketId());
     }
 
     private void send(String routingKey, Object payload, @Nullable String sagaId, String correlationId) {

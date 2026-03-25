@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TicketCreatedEvent {
+    private Long id; // orderId
     private Long ticketId;
-    private Long orderId;
-    private Long assignedChefId;
 }

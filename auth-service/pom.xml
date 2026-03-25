@@ -101,31 +101,33 @@
 				processor AFTER Lombok (order matters: lombok-mapstruct-binding
 				ensures Lombok runs first so MapStruct sees the generated getters).
 			-->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<annotationProcessorPaths>
-						<!-- 1. Binding helper: ensures Lombok runs before MapStruct -->
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok-mapstruct-binding</artifactId>
-							<version>${lombok-mapstruct-binding.version}</version>
-						</path>
-						<!-- 2. Lombok -->
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</path>
-						<!-- 3. MapStruct (reads Lombok-generated code) -->
-						<path>
-							<groupId>org.mapstruct</groupId>
-							<artifactId>mapstruct-processor</artifactId>
-							<version>${mapstruct.version}</version>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <!-- 1. LOMBOK (Must be first) -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.30</version> <!-- Add specific version here -->
+                        </path>
+                        <!-- 2. BINDING (Helps MapStruct see Lombok getters) -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>${lombok-mapstruct-binding.version}</version>
+                        </path>
+                        <!-- 3. MAPSTRUCT -->
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
 		</plugins>
 	</build>
 

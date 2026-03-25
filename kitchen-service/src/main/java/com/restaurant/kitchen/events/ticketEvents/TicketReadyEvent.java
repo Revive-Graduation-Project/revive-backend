@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TicketReadyEvent {
+  private Long id; //order with this id his ticket in kitchen is set to ready
   private Long ticketId;
-  private Long orderId;
-  private Long assignedChefId;
 }

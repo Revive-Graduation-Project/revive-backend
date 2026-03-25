@@ -19,11 +19,11 @@ public class ChefController {
     private final TicketService service;
 
     @PatchMapping("/{ticketId}/status")
-    public ResponseEntity<Void> updateStatus(@PathVariable Long ticketId,
+    public ResponseEntity<KitchenTicketDTO> updateStatus(@PathVariable Long ticketId,
                                              @Valid @RequestBody UpdateTicketStatusRequest statusRequest) {
 
-        service.updateTicketStatus(ticketId, statusRequest.status());
-        return ResponseEntity.ok().build();
+        KitchenTicketDTO updatedTicket = service.updateTicketStatus(ticketId, statusRequest.status());
+        return ResponseEntity.ok(updatedTicket);
     }
 
     @GetMapping("/active")

@@ -1,5 +1,6 @@
 package com.restaurant.kitchen.service;
 
+import com.restaurant.kitchen.dto.ChefProfileDTO;
 import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;
 
@@ -10,10 +11,10 @@ public interface ChefService {
 
     void createChefProfile(UserCreatedEvent event, String correlationId, String sagaId);
 
-    void updateChefDisplayName(Long id, String displayName);
+    ChefProfileDTO updateChefDisplayName(Long id, String displayName);
 
-    void updateChefStation(Long id, Station station);
+    ChefProfileDTO updateChefStation(Long id, Station station);
 
-    void updateChefStatus(Long id, ChefStatus status);
+    ChefProfileDTO updateChefStatus(Long id, ChefStatus status);
 
 }

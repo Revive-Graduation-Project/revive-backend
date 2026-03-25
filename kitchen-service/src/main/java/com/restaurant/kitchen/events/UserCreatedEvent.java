@@ -1,7 +1,5 @@
 package com.restaurant.kitchen.events;
 
-import com.restaurant.kitchen.enums.ChefStatus;
-import com.restaurant.kitchen.enums.Station;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,9 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserCreatedEvent {
-    private Long authUserId;
+    private Long id;
     private String role;
-    private String displayName;
-    private Station station;
-    private ChefStatus status;
 }

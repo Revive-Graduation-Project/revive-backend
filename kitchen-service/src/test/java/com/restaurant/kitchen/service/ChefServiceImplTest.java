@@ -1,5 +1,6 @@
 package com.restaurant.kitchen.service;
 
+import com.restaurant.kitchen.dto.ChefProfileDTO;
 import com.restaurant.kitchen.entity.ChefProfile;
 import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;
@@ -41,23 +42,31 @@ class ChefServiceImplTest {
     void shouldUpdateDisplayNameSuccessfully() {
         ChefProfile chef = new ChefProfile();
         chef.setDisplayName("OldName");
+        
+        ChefProfileDTO dto = new ChefProfileDTO(1L, 10L, "NewName", Station.GRILL, ChefStatus.ACTIVE);
 
         when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        when(chefMapper.toDTO(chef)).thenReturn(dto);
 
-        chefService.updateChefDisplayName(1L, "NewName");
+        ChefProfileDTO result = chefService.updateChefDisplayName(1L, "NewName");
 
         assertEquals("NewName", chef.getDisplayName());
+        assertEquals("NewName", result.displayName());
     }
 
     @Test
     void shouldTrimDisplayNameBeforeSaving() {
         ChefProfile chef = new ChefProfile();
+        
+        ChefProfileDTO dto = new ChefProfileDTO(1L, 10L, "NewName", Station.GRILL, ChefStatus.ACTIVE);
 
         when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        when(chefMapper.toDTO(chef)).thenReturn(dto);
 
-        chefService.updateChefDisplayName(1L, "  NewName  ");
+        ChefProfileDTO result = chefService.updateChefDisplayName(1L, "  NewName  ");
 
         assertEquals("NewName", chef.getDisplayName());
+        assertEquals("NewName", result.displayName());
     }
 
     @Test
@@ -76,12 +85,16 @@ class ChefServiceImplTest {
     void shouldUpdateStationSuccessfully() {
         ChefProfile chef = new ChefProfile();
         chef.setStation(Station.GRILL);
+        
+        ChefProfileDTO dto = new ChefProfileDTO(1L, 10L, "John", Station.FRY, ChefStatus.ACTIVE);
 
         when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        when(chefMapper.toDTO(chef)).thenReturn(dto);
 
-        chefService.updateChefStation(1L, Station.FRY);
+        ChefProfileDTO result = chefService.updateChefStation(1L, Station.FRY);
 
         assertEquals(Station.FRY, chef.getStation());
+        assertEquals(Station.FRY, result.station());
     }
 
     @Test
@@ -100,12 +113,16 @@ class ChefServiceImplTest {
     void shouldUpdateChefStatusSuccessfully() {
         ChefProfile chef = new ChefProfile();
         chef.setStatus(ChefStatus.ACTIVE);
+        
+        ChefProfileDTO dto = new ChefProfileDTO(1L, 10L, "John", Station.GRILL, ChefStatus.INACTIVE);
 
         when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        when(chefMapper.toDTO(chef)).thenReturn(dto);
 
-        chefService.updateChefStatus(1L, ChefStatus.INACTIVE);
+        ChefProfileDTO result = chefService.updateChefStatus(1L, ChefStatus.INACTIVE);
 
         assertEquals(ChefStatus.INACTIVE, chef.getStatus());
+        assertEquals(ChefStatus.INACTIVE, result.status());
     }
 
     @Test
@@ -135,7 +152,7 @@ class ChefServiceImplTest {
     void shouldRepublishChefCreatedWhenChefAlreadyExists() {
         UserCreatedEvent event = new UserCreatedEvent();
         event.setRole("CHEF");
-        event.setAuthUserId(1L);
+        event.setId(1L);
 
         ChefProfile existingChef = new ChefProfile();
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.of(existingChef));
@@ -150,18 +167,13 @@ class ChefServiceImplTest {
     void shouldSaveAndPublishWhenChefDoesNotExist() {
         UserCreatedEvent event = new UserCreatedEvent();
         event.setRole("CHEF");
-        event.setAuthUserId(1L);
-
-        ChefProfile mappedChef = new ChefProfile();
-        ChefProfile savedChef = new ChefProfile();
+        event.setId(1L);
 
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
-        when(chefMapper.toEntity(event)).thenReturn(mappedChef);
-        when(chefProfileRepository.save(mappedChef)).thenReturn(savedChef);
 
         chefService.createChefProfile(event, "corr-001", "saga-001");
 
-        verify(chefProfileRepository).save(mappedChef);
+        verify(chefProfileRepository).save(any(ChefProfile.class));
         verify(publisher).publishChefCreated(any(), eq("saga-001"), eq("corr-001"));
     }
 
@@ -169,11 +181,10 @@ class ChefServiceImplTest {
     void shouldThrowWhenSaveFails() {
         UserCreatedEvent event = new UserCreatedEvent();
         event.setRole("CHEF");
-        event.setAuthUserId(1L);
+        event.setId(1L);
 
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
-        when(chefMapper.toEntity(event)).thenReturn(new ChefProfile());
-        when(chefProfileRepository.save(any())).thenThrow(new RuntimeException("DB error"));
+        when(chefProfileRepository.save(any(ChefProfile.class))).thenThrow(new RuntimeException("DB error"));
 
         assertThrows(RuntimeException.class,
                 () -> chefService.createChefProfile(event, "corr-001", "saga-001"));

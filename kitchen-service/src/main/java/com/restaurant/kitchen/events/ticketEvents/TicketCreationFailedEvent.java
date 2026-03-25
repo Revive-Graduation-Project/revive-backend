@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TicketCreationFailedEvent {
-    private Long orderId;
+    private Long id; // orderId
     private String reason;
 }

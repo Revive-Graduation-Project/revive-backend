@@ -1,5 +1,6 @@
 package com.restaurant.kitchen.controller;
 
+import com.restaurant.kitchen.dto.ChefProfileDTO;
 import com.restaurant.kitchen.dto.UpdateDisplayNameRequest;
 import com.restaurant.kitchen.dto.UpdateStationRequest;
 import com.restaurant.kitchen.dto.UpdateChefStatusRequest;
@@ -19,26 +20,26 @@ public class AdminController {
 
 
     @PatchMapping("/{id}/display-name")
-    public ResponseEntity<Void> updateDisplayName(@PathVariable Long id,
-                                                  @Valid @RequestBody UpdateDisplayNameRequest displayNameRequest) {
+    public ResponseEntity<ChefProfileDTO> updateDisplayName(@PathVariable Long id,
+                                                            @Valid @RequestBody UpdateDisplayNameRequest displayNameRequest) {
 
-        service.updateChefDisplayName(id, displayNameRequest.displayName());
-        return ResponseEntity.ok().build();
+        ChefProfileDTO updatedChefProfile = service.updateChefDisplayName(id, displayNameRequest.displayName());
+        return ResponseEntity.ok(updatedChefProfile);
     }
 
     @PatchMapping("/{id}/station")
-    public ResponseEntity<Void> updateStation(@PathVariable Long id,
+    public ResponseEntity<ChefProfileDTO> updateStation(@PathVariable Long id,
                                               @Valid @RequestBody UpdateStationRequest stationRequest) {
 
-        service.updateChefStation(id, stationRequest.station());
-        return ResponseEntity.ok().build();
+        ChefProfileDTO updatedChefProfile = service.updateChefStation(id, stationRequest.station());
+        return ResponseEntity.ok(updatedChefProfile);
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<Void> updateStatus(@PathVariable Long id,
+    public ResponseEntity<ChefProfileDTO> updateStatus(@PathVariable Long id,
                                              @Valid @RequestBody UpdateChefStatusRequest statusRequest) {
 
-        service.updateChefStatus(id, statusRequest.status());
-        return ResponseEntity.ok().build();
+        ChefProfileDTO updatedChefProfile = service.updateChefStatus(id, statusRequest.status());
+        return ResponseEntity.ok(updatedChefProfile);
     }
 }

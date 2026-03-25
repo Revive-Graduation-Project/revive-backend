@@ -12,5 +12,5 @@ public interface TicketService {
 
     List<KitchenTicketDTO> getActiveTickets();
 
-    void updateTicketStatus(Long id, TicketStatus status);
+    KitchenTicketDTO updateTicketStatus(Long id, TicketStatus status);
 }

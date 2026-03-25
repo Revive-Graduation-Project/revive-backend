@@ -8,5 +8,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderCreatedEvent {
-    private Long orderId;
+    private Long id; //orderId
 }

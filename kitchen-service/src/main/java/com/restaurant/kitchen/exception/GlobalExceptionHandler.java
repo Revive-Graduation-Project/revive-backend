@@ -101,7 +101,7 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(error -> Objects.requireNonNullElse(error.getDefaultMessage(), "Validation error"))  // gets message from annotation
                 .findFirst()
-                .get(); // used get() because message will never be empty
+                .orElse("Validation error"); // potential NoSuchElementException
 
         ErrorResponse error = new ErrorResponse(message, Instant.now());
         return ResponseEntity
