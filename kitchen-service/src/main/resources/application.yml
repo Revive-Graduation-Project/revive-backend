@@ -3,9 +3,10 @@ spring:
     name: kitchen-service
 
   datasource:
-    url: jdbc:postgresql://kitchen-db:5432/kitchen_db
-    username: postgres
-    password: postgres
+    # Uses 'kitchen-db' for Docker, falls back to 'localhost' for  IDE
+    url: jdbc:postgresql://${DB_HOST:kitchen-db}:${DB_PORT:5432}/kitchen_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -17,5 +18,44 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+          jws-algorithm: HS384
+
+  rabbitmq:
+    # Uses 'rabbitmq' for Docker, falls back to 'localhost' for IDE
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+        default-requeue-rejected: false
+
 server:
-  port: 8080
+  # Defaults to 8080 (Docker standard), can be overridden to 8086 locally via ENV
+  port: ${SERVER_PORT:8080}
+
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      user-created:
+        name: user.created.queue
+        routing-key: user.created
+        dlq-name: user.created.queue.dlq
+        dlq-routing-key: user.created.dlq
+      order-created:
+        name: order.created.queue
+        routing-key: order.created
+        dlq-name: order.created.queue.dlq
+        dlq-routing-key: order.created.dlq

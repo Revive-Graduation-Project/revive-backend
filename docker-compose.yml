@@ -257,6 +257,7 @@ services:
     networks:
       - restaurant-net
 
+
   # ─────────────────────────────────────────────
   # Next.js Frontend / AI Proxy  (disabled — uncomment when ready)
   # ─────────────────────────────────────────────
@@ -282,3 +283,4 @@ volumes:
   menu-db-data:
   order-db-data:
   kitchen-db-data:
+  rabbitmq_data:

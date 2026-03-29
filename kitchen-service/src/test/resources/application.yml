@@ -1,0 +1,27 @@
+# if you want to test Repositories @DataJpaTest
+# then uncomment to use H2 instead of messing with the postgresql production database
+
+#spring:
+#  datasource:
+#    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+#    username: sa
+#    password:
+#    driver-class-name: org.h2.Driver
+#  jpa:
+#    hibernate:
+#      ddl-auto: create-drop
+#    database-platform: org.hibernate.dialect.H2Dialect
+#    show-sql: true
+
+
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      user-created:
+        name: user.created.queue
+        routing-key: user.created
+
+        dlq-name: user.created.queue.dlq
+        dlq-routing-key: user.created.dlq
+
