@@ -3,6 +3,7 @@ package com.restaurant.kitchen.entity;
 import com.restaurant.kitchen.enums.TicketStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -26,16 +27,16 @@ public class KitchenTicket {
     private Long orderId ;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private TicketStatus status ;
 
-    //Eager due to the close connection between the ticket and the chef
     // one chef can be assigned to many tickets
     // one ticket should be assigned to only one chef
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_chef_id")
     private ChefProfile assignedChef;
 
-
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt ;
 }
