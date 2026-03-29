@@ -6,6 +6,7 @@ import com.restaurant.kitchen.entity.KitchenTicket;
 import com.restaurant.kitchen.enums.ChefStatus;
 import com.restaurant.kitchen.enums.Station;
 import com.restaurant.kitchen.enums.TicketStatus;
+import com.restaurant.kitchen.events.ProfileCreatedEvent;
 import com.restaurant.kitchen.events.TicketReadyEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
 import com.restaurant.kitchen.exception.ChefNotFoundException;
@@ -15,21 +16,29 @@ import com.restaurant.kitchen.mapper.KitchenTicketMapper;
 import com.restaurant.kitchen.messaging.MessagePublisher;
 import com.restaurant.kitchen.repository.ChefProfileRepository;
 import com.restaurant.kitchen.repository.KitchenTicketRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class KitchenServiceImplTest {
+
+    @Mock
+    private MessagePublisher publisher;
 
     @Mock
     private ChefProfileRepository chefProfileRepository;
@@ -43,250 +52,326 @@ class KitchenServiceImplTest {
     @Mock
     private ChefProfileMapper chefMapper;
 
-    @Mock
-    private MessagePublisher publisher;
-
     @InjectMocks
     private KitchenServiceImpl kitchenService;
 
-    // ── updateDisplayName ────────────────────────────────────────────────
+    // Dummy Data Objects
+    private UserCreatedEvent chefUserEvent;
+    private UserCreatedEvent nonChefUserEvent;
+    private ChefProfile chefProfile;
+    private ProfileCreatedEvent profileCreatedEvent;
+    private KitchenTicket kitchenTicket;
+    private TicketReadyEvent ticketReadyEvent;
+    private KitchenTicketDTO kitchenTicketDTO;
+
+    // Realistic Constant Values
+    private static final String SAGA_ID = "saga-483d-9f89-c44a";
+    private static final String CORRELATION_ID = "corr-1122-3344-5566";
+    private static final Long CHEF_ID = 205L;
+    private static final Long TICKET_ID = 9081L;
+    private static final Long AUTH_USER_ID = 10042L;
+
+    @BeforeEach
+    void setUp() {
+        // Arrange reusable, specific dummy data
+        chefUserEvent = mock(UserCreatedEvent.class);
+        lenient().when(chefUserEvent.getAuthUserId()).thenReturn(AUTH_USER_ID);
+        lenient().when(chefUserEvent.getRole()).thenReturn("CHEF");
+
+        nonChefUserEvent = mock(UserCreatedEvent.class);
+        lenient().when(nonChefUserEvent.getAuthUserId()).thenReturn(8851L);
+        lenient().when(nonChefUserEvent.getRole()).thenReturn("WAITER");
+
+        chefProfile = ChefProfile.builder()
+                .id(CHEF_ID)
+                .authUserId(AUTH_USER_ID)
+                .displayName("Gordon Ramsay")
+                .station(Station.GRILL)
+                .status(ChefStatus.ACTIVE)
+                .build();
+
+        profileCreatedEvent = mock(ProfileCreatedEvent.class);
+
+        kitchenTicket = KitchenTicket.builder()
+                .id(TICKET_ID)
+                .status(TicketStatus.PENDING)
+                .build();
+
+        ticketReadyEvent = mock(TicketReadyEvent.class);
+
+        kitchenTicketDTO = mock(KitchenTicketDTO.class);
+    }
+
+    // ------------------------------------------------------------------------
+    // Tests for createChefProfile
+    // ------------------------------------------------------------------------
 
     @Test
-    void shouldUpdateDisplayNameSuccessfully() {
-        ChefProfile chef = new ChefProfile();
-        chef.setDisplayName("OldName");
+    @DisplayName("Should gracefully ignore user creation when user role is not CHEF")
+    void createChefProfile_WhenUserIsNotChef_ShouldReturnWithoutSavingAndPublishing() {
+        // Arrange
+        // (nonChefUserEvent prepared in setUp)
 
-        when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        // Act
+        kitchenService.createChefProfile(nonChefUserEvent, CORRELATION_ID, SAGA_ID);
 
-        kitchenService.updateDisplayName(1L, "NewName");
-
-        assertEquals("NewName", chef.getDisplayName());
-        verify(chefProfileRepository).save(chef);
+        // Assert
+        verify(chefProfileRepository, never()).findByAuthUserId(any());
+        verify(chefProfileRepository, never()).save(any());
+        verify(publisher, never()).publishChefCreated(any(), anyString(), anyString());
     }
 
     @Test
-    void shouldTrimDisplayNameBeforeSaving() {
-        ChefProfile chef = new ChefProfile();
+    @DisplayName("Should republish ProfileCreatedEvent without saving database when chef already exists")
+    void createChefProfile_WhenChefAlreadyExists_ShouldRepublishEvent() {
+        // Arrange
+        when(chefProfileRepository.findByAuthUserId(AUTH_USER_ID)).thenReturn(Optional.of(chefProfile));
+        when(chefMapper.toProfileCreatedEvent(chefProfile)).thenReturn(profileCreatedEvent);
 
-        when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        // Act
+        kitchenService.createChefProfile(chefUserEvent, CORRELATION_ID, SAGA_ID);
 
-        kitchenService.updateDisplayName(1L, "  NewName  ");
-
-        assertEquals("NewName", chef.getDisplayName());
-        verify(chefProfileRepository).save(chef);
+        // Assert
+        verify(chefProfileRepository, times(1)).findByAuthUserId(AUTH_USER_ID);
+        verify(chefProfileRepository, never()).save(any());
+        verify(chefMapper, times(1)).toProfileCreatedEvent(chefProfile);
+        verify(publisher, times(1)).publishChefCreated(profileCreatedEvent, SAGA_ID, CORRELATION_ID);
     }
 
     @Test
-    void shouldThrowChefNotFoundWhenUpdatingDisplayNameOfNonExistentChef() {
-        when(chefProfileRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("Should successfully save chef to database and publish event when chef is entirely new")
+    void createChefProfile_WhenChefIsNew_ShouldSaveAndPublishEvent() {
+        // Arrange
+        when(chefProfileRepository.findByAuthUserId(AUTH_USER_ID)).thenReturn(Optional.empty());
+        when(chefMapper.toEntity(chefUserEvent)).thenReturn(chefProfile);
+        when(chefProfileRepository.save(chefProfile)).thenReturn(chefProfile);
+        when(chefMapper.toProfileCreatedEvent(chefProfile)).thenReturn(profileCreatedEvent);
 
-        assertThrows(ChefNotFoundException.class,
-                () -> kitchenService.updateDisplayName(99L, "NewName"));
+        // Act
+        kitchenService.createChefProfile(chefUserEvent, CORRELATION_ID, SAGA_ID);
 
+        // Assert
+        verify(chefProfileRepository, times(1)).findByAuthUserId(AUTH_USER_ID);
+        verify(chefMapper, times(1)).toEntity(chefUserEvent);
+        verify(chefProfileRepository, times(1)).save(chefProfile);
+        verify(chefMapper, times(1)).toProfileCreatedEvent(chefProfile);
+        verify(publisher, times(1)).publishChefCreated(profileCreatedEvent, SAGA_ID, CORRELATION_ID);
+    }
+
+    @Test
+    @DisplayName("Should throw custom RuntimeException when saving down to DB fails")
+    void createChefProfile_WhenDatabaseSaveFails_ShouldThrowRuntimeException() {
+        // Arrange
+        when(chefProfileRepository.findByAuthUserId(AUTH_USER_ID)).thenReturn(Optional.empty());
+        when(chefMapper.toEntity(chefUserEvent)).thenReturn(chefProfile);
+        when(chefProfileRepository.save(chefProfile)).thenThrow(new RuntimeException("DB Connection Timeout"));
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> 
+                kitchenService.createChefProfile(chefUserEvent, CORRELATION_ID, SAGA_ID)
+        );
+
+        assertTrue(exception.getMessage().contains("Chef profile creation failed for userId: " + AUTH_USER_ID));
+        verify(chefProfileRepository, times(1)).save(chefProfile);
+        verify(publisher, never()).publishChefCreated(any(), anyString(), anyString());
+    }
+
+    // ------------------------------------------------------------------------
+    // Tests for updateDisplayName
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Should securely update and trim display name when chef is correctly found")
+    void updateDisplayName_WhenChefExists_ShouldUpdateTrimmedNameAndSave() {
+        // Arrange
+        String untrimmedNewName = "   Chef Marco Pierre White   ";
+        when(chefProfileRepository.findById(CHEF_ID)).thenReturn(Optional.of(chefProfile));
+
+        // Act
+        kitchenService.updateDisplayName(CHEF_ID, untrimmedNewName);
+
+        // Assert
+        assertEquals("Chef Marco Pierre White", chefProfile.getDisplayName());
+        verify(chefProfileRepository, times(1)).findById(CHEF_ID);
+        verify(chefProfileRepository, times(1)).save(chefProfile);
+    }
+
+    @Test
+    @DisplayName("Should throw ChefNotFoundException during name update if chef does not exist")
+    void updateDisplayName_WhenChefDoesNotExist_ShouldThrowException() {
+        // Arrange
+        when(chefProfileRepository.findById(CHEF_ID)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ChefNotFoundException.class, () -> 
+                kitchenService.updateDisplayName(CHEF_ID, "Chef Marco")
+        );
+
+        verify(chefProfileRepository, times(1)).findById(CHEF_ID);
         verify(chefProfileRepository, never()).save(any());
     }
 
-    // ── updateStation ────────────────────────────────────────────────────
+    // ------------------------------------------------------------------------
+    // Tests for updateStation
+    // ------------------------------------------------------------------------
 
     @Test
-    void shouldUpdateStationSuccessfully() {
-        ChefProfile chef = new ChefProfile();
-        chef.setStation(Station.GRILL);
+    @DisplayName("Should accurately update chef station when valid chef is found")
+    void updateStation_WhenChefExists_ShouldUpdateStationAndSave() {
+        // Arrange
+        when(chefProfileRepository.findById(CHEF_ID)).thenReturn(Optional.of(chefProfile));
 
-        when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        // Act
+        kitchenService.updateStation(CHEF_ID, Station.FRY);
 
-        kitchenService.updateStation(1L, Station.FRY);
-
-        assertEquals(Station.FRY, chef.getStation());
-        verify(chefProfileRepository).save(chef);
+        // Assert
+        assertEquals(Station.FRY, chefProfile.getStation());
+        verify(chefProfileRepository, times(1)).findById(CHEF_ID);
+        verify(chefProfileRepository, times(1)).save(chefProfile);
     }
 
     @Test
-    void shouldThrowChefNotFoundWhenUpdatingStationOfNonExistentChef() {
-        when(chefProfileRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("Should throw ChefNotFoundException during station update if chef does not exist")
+    void updateStation_WhenChefDoesNotExist_ShouldThrowException() {
+        // Arrange
+        when(chefProfileRepository.findById(CHEF_ID)).thenReturn(Optional.empty());
 
-        assertThrows(ChefNotFoundException.class,
-                () -> kitchenService.updateStation(99L, Station.GRILL));
+        // Act & Assert
+        assertThrows(ChefNotFoundException.class, () -> 
+                kitchenService.updateStation(CHEF_ID, Station.FRY)
+        );
 
+        verify(chefProfileRepository, times(1)).findById(CHEF_ID);
         verify(chefProfileRepository, never()).save(any());
     }
 
-    // ── updateChefStatus ─────────────────────────────────────────────────
+    // ------------------------------------------------------------------------
+    // Tests for updateChefStatus
+    // ------------------------------------------------------------------------
 
     @Test
-    void shouldUpdateChefStatusSuccessfully() {
-        ChefProfile chef = new ChefProfile();
-        chef.setStatus(ChefStatus.ACTIVE);
+    @DisplayName("Should update current chef status successfully when valid chef is found")
+    void updateChefStatus_WhenChefExists_ShouldUpdateStatusAndSave() {
+        // Arrange
+        when(chefProfileRepository.findById(CHEF_ID)).thenReturn(Optional.of(chefProfile));
 
-        when(chefProfileRepository.findById(1L)).thenReturn(Optional.of(chef));
+        // Act
+        kitchenService.updateChefStatus(CHEF_ID, ChefStatus.INACTIVE);
 
-        kitchenService.updateChefStatus(1L, ChefStatus.INACTIVE);
-
-        assertEquals(ChefStatus.INACTIVE, chef.getStatus());
-        verify(chefProfileRepository).save(chef);
+        // Assert
+        assertEquals(ChefStatus.INACTIVE, chefProfile.getStatus());
+        verify(chefProfileRepository, times(1)).findById(CHEF_ID);
+        verify(chefProfileRepository, times(1)).save(chefProfile);
     }
 
     @Test
-    void shouldThrowChefNotFoundWhenUpdatingStatusOfNonExistentChef() {
-        when(chefProfileRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("Should throw ChefNotFoundException during status update if chef does not exist")
+    void updateChefStatus_WhenChefDoesNotExist_ShouldThrowException() {
+        // Arrange
+        when(chefProfileRepository.findById(CHEF_ID)).thenReturn(Optional.empty());
 
-        assertThrows(ChefNotFoundException.class,
-                () -> kitchenService.updateChefStatus(99L, ChefStatus.INACTIVE));
+        // Act & Assert
+        assertThrows(ChefNotFoundException.class, () -> 
+                kitchenService.updateChefStatus(CHEF_ID, ChefStatus.INACTIVE)
+        );
 
+        verify(chefProfileRepository, times(1)).findById(CHEF_ID);
         verify(chefProfileRepository, never()).save(any());
     }
 
-    // ── updateTicketStatus ───────────────────────────────────────────────
+    // ------------------------------------------------------------------------
+    // Tests for updateTicketStatus
+    // ------------------------------------------------------------------------
 
     @Test
-    void shouldUpdateTicketStatusSuccessfully() {
-        KitchenTicket ticket = buildTicket(TicketStatus.PENDING);
+    @DisplayName("Should only update DB without triggering event when new ticket status is NOT READY")
+    void updateTicketStatus_WhenStatusIsNotReady_ShouldUpdateAndSaveWithoutPublishing() {
+        // Arrange
+        when(kitchenTicketRepository.findById(TICKET_ID)).thenReturn(Optional.of(kitchenTicket));
+        TicketStatus newStatus = TicketStatus.COOKING;
 
-        when(kitchenTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        // Act
+        kitchenService.updateTicketStatus(TICKET_ID, newStatus);
 
-        kitchenService.updateTicketStatus(1L, TicketStatus.COOKING);
-
-        assertEquals(TicketStatus.COOKING, ticket.getStatus());
-        verify(kitchenTicketRepository).save(ticket);
+        // Assert
+        assertEquals(TicketStatus.COOKING, kitchenTicket.getStatus());
+        verify(kitchenTicketRepository, times(1)).findById(TICKET_ID);
+        verify(kitchenTicketRepository, times(1)).save(kitchenTicket);
+        verify(publisher, never()).publishTicketReady(anyLong(), any(), anyString(), anyString());
     }
 
     @Test
-    void shouldPublishTicketReadyEventWhenStatusIsReady() {
-        KitchenTicket ticket = buildTicket(TicketStatus.COOKING);
-        TicketReadyEvent event = new TicketReadyEvent();
+    @DisplayName("Should update DB AND trigger TicketReadyEvent when ticket status maps exactly to READY")
+    void updateTicketStatus_WhenStatusIsReady_ShouldUpdateSaveAndPublishEvent() {
+        // Arrange
+        when(kitchenTicketRepository.findById(TICKET_ID)).thenReturn(Optional.of(kitchenTicket));
+        when(ticketMapper.toTicketReadyEvent(kitchenTicket)).thenReturn(ticketReadyEvent);
 
-        when(kitchenTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(ticketMapper.toTicketReadyEvent(ticket)).thenReturn(event);
+        // Act
+        kitchenService.updateTicketStatus(TICKET_ID, TicketStatus.READY);
 
-        kitchenService.updateTicketStatus(1L, TicketStatus.READY);
-
-        verify(publisher).publishTicketReady(eq(1L), eq(event), any(), any());
+        // Assert
+        assertEquals(TicketStatus.READY, kitchenTicket.getStatus());
+        verify(kitchenTicketRepository, times(1)).findById(TICKET_ID);
+        verify(kitchenTicketRepository, times(1)).save(kitchenTicket);
+        verify(ticketMapper, times(1)).toTicketReadyEvent(kitchenTicket);
+        
+        // Use anyString() because correlationId and sagaId are UUID.randomUUID()
+        verify(publisher, times(1)).publishTicketReady(eq(TICKET_ID), eq(ticketReadyEvent), anyString(), anyString());
     }
 
     @Test
-    void shouldNotPublishEventWhenStatusIsNotReady() {
-        KitchenTicket ticket = buildTicket(TicketStatus.PENDING);
+    @DisplayName("Should throw TicketNotFoundException during ticket update if no existing ticket matched ID")
+    void updateTicketStatus_WhenTicketDoesNotExist_ShouldThrowException() {
+        // Arrange
+        when(kitchenTicketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
 
-        when(kitchenTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        // Act & Assert
+        assertThrows(TicketNotFoundException.class, () -> 
+                kitchenService.updateTicketStatus(TICKET_ID, TicketStatus.COOKING)
+        );
 
-        kitchenService.updateTicketStatus(1L, TicketStatus.COOKING);
-
-        verifyNoInteractions(publisher);
-    }
-
-    @Test
-    void shouldThrowTicketNotFoundWhenUpdatingStatusOfNonExistentTicket() {
-        when(kitchenTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThrows(TicketNotFoundException.class,
-                () -> kitchenService.updateTicketStatus(99L, TicketStatus.READY));
-
+        verify(kitchenTicketRepository, times(1)).findById(TICKET_ID);
         verify(kitchenTicketRepository, never()).save(any());
-        verifyNoInteractions(publisher);
+        verify(publisher, never()).publishTicketReady(anyLong(), any(), anyString(), anyString());
     }
 
-    // ── getActiveTickets ─────────────────────────────────────────────────
+    // ------------------------------------------------------------------------
+    // Tests for getActiveTickets
+    // ------------------------------------------------------------------------
 
     @Test
-    void shouldReturnActiveTicketsSuccessfully() {
-        KitchenTicket ticket = buildTicket(TicketStatus.COOKING);
-        KitchenTicketDTO dto = new KitchenTicketDTO(100L, TicketStatus.COOKING, "Chef John", LocalDateTime.now());
+    @DisplayName("Should correctly return a list of mapped DTOs if repository finds non-ready active tickets")
+    void getActiveTickets_WhenActiveTicketsExist_ShouldReturnMappedDtoList() {
+        // Arrange
+        List<KitchenTicket> returnedTickets = List.of(kitchenTicket);
+        List<KitchenTicketDTO> mappedDTOs = List.of(kitchenTicketDTO);
+        
+        when(kitchenTicketRepository.findByStatusNot(TicketStatus.READY)).thenReturn(returnedTickets);
+        when(ticketMapper.toDTOList(returnedTickets)).thenReturn(mappedDTOs);
 
-        when(kitchenTicketRepository.findByStatusNot(TicketStatus.READY)).thenReturn(List.of(ticket));
-        when(ticketMapper.toDTOList(List.of(ticket))).thenReturn(List.of(dto));
-
+        // Act
         List<KitchenTicketDTO> result = kitchenService.getActiveTickets();
 
+        // Assert
+        assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals(TicketStatus.COOKING, result.get(0).status());
+        verify(kitchenTicketRepository, times(1)).findByStatusNot(TicketStatus.READY);
+        verify(ticketMapper, times(1)).toDTOList(returnedTickets);
     }
 
     @Test
-    void shouldThrowTicketNotFoundWhenNoActiveTicketsExist() {
-        when(kitchenTicketRepository.findByStatusNot(TicketStatus.READY)).thenReturn(List.of());
+    @DisplayName("Should throw TicketNotFoundException with null when no active unready tickets are found")
+    void getActiveTickets_WhenNoActiveTicketsExist_ShouldThrowException() {
+        // Arrange
+        when(kitchenTicketRepository.findByStatusNot(TicketStatus.READY)).thenReturn(Collections.emptyList());
 
-        assertThrows(TicketNotFoundException.class,
-                () -> kitchenService.getActiveTickets());
+        // Act & Assert
+        assertThrows(TicketNotFoundException.class, () -> 
+                kitchenService.getActiveTickets()
+        );
 
-        verifyNoInteractions(ticketMapper);
-    }
-
-    // ── createChefProfile ────────────────────────────────────────────────
-
-    @Test
-    void shouldIgnoreNonChefUser() {
-        UserCreatedEvent event = new UserCreatedEvent();
-        event.setRole("CUSTOMER");
-
-        kitchenService.createChefProfile(event, "corr-001", "saga-001");
-
-        verifyNoInteractions(chefProfileRepository);
-        verifyNoInteractions(publisher);
-    }
-
-    @Test
-    void shouldRepublishChefCreatedWhenChefAlreadyExists() {
-        UserCreatedEvent event = new UserCreatedEvent();
-        event.setRole("CHEF");
-        event.setAuthUserId(1L);
-
-        ChefProfile existingChef = new ChefProfile();
-        when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.of(existingChef));
-
-        kitchenService.createChefProfile(event, "corr-001", "saga-001");
-
-        verify(chefProfileRepository, never()).save(any());
-        verify(publisher).publishChefCreated(any(), eq("saga-001"), eq("corr-001"));
-    }
-
-    @Test
-    void shouldSaveAndPublishWhenChefDoesNotExist() {
-        UserCreatedEvent event = new UserCreatedEvent();
-        event.setRole("CHEF");
-        event.setAuthUserId(1L);
-
-        ChefProfile mappedChef = new ChefProfile();
-        ChefProfile savedChef = new ChefProfile();
-
-        when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
-        when(chefMapper.toEntity(event)).thenReturn(mappedChef);
-        when(chefProfileRepository.save(mappedChef)).thenReturn(savedChef);
-
-        kitchenService.createChefProfile(event, "corr-001", "saga-001");
-
-        verify(chefProfileRepository).save(mappedChef);
-        verify(publisher).publishChefCreated(any(), eq("saga-001"), eq("corr-001"));
-    }
-
-    @Test
-    void shouldThrowWhenSaveFails() {
-        UserCreatedEvent event = new UserCreatedEvent();
-        event.setRole("CHEF");
-        event.setAuthUserId(1L);
-
-        when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
-        when(chefMapper.toEntity(event)).thenReturn(new ChefProfile());
-        when(chefProfileRepository.save(any())).thenThrow(new RuntimeException("DB error"));
-
-        assertThrows(RuntimeException.class,
-                () -> kitchenService.createChefProfile(event, "corr-001", "saga-001"));
-
-        verifyNoInteractions(publisher);
-    }
-
-    // ── helper ───────────────────────────────────────────────────────────
-
-    private KitchenTicket buildTicket(TicketStatus status) {
-        ChefProfile chef = new ChefProfile();
-        chef.setId(1L);
-        chef.setDisplayName("Chef John");
-
-        return KitchenTicket.builder()
-                .id(1L)
-                .orderId(100L)
-                .status(status)
-                .assignedChef(chef)
-                .createdAt(LocalDateTime.now())
-                .build();
+        verify(kitchenTicketRepository, times(1)).findByStatusNot(TicketStatus.READY);
+        verify(ticketMapper, never()).toDTOList(any());
     }
 }
