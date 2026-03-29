@@ -3,9 +3,10 @@ spring:
     name: order-service
 
   datasource:
-    url: jdbc:postgresql://order-db:5432/order_db
-    username: postgres
-    password: postgres
+    # Uses 'order-db' for Docker, falls back to 'localhost' for IDE
+    url: jdbc:postgresql://${DB_HOST:order-db}:${DB_PORT:5432}/order_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -17,5 +18,47 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+          jws-algorithm: HS384
+
+  rabbitmq:
+    # Uses 'rabbitmq' for Docker, falls back to 'localhost' for IDE
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+        default-requeue-rejected: false
+
 server:
-  port: 8080
+  # Defaults to 8080 (Docker standard), can be overridden locally via ENV
+  port: ${SERVER_PORT:8080}
+
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      ticket-created:
+        name: ticket.created.queue
+        routing-key: ticket.created
+      ticket-failed:
+        name: ticket.failed.queue
+        routing-key: ticket.failed
+      ticket-ready:
+        name: ticket.ready.queue
+        routing-key: ticket.ready
+
+  services:
+    menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
+    inventory-url: ${INVENTORY_SERVICE_URL:http://inventory-service:8080}

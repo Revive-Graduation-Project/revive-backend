@@ -59,9 +59,7 @@ public class ChefServiceImpl implements ChefService {
               chefProfileRepository.save(
                      ChefProfile.builder()
                              .authUserId(event.getId())
-                             .station(Station.UNASSIGNED)
-                             .displayName("Unassigned")
-                             .status(ChefStatus.INACTIVE)
+                             .displayName(event.getUsername())
                              .build()
             );
             publisher.publishChefCreated(

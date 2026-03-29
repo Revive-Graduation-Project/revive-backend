@@ -28,7 +28,7 @@ public class MessageListener {
         orderService.cancelOrder(event.getId(), event.getReason());
     }
 
-    @RabbitListener(queues = "ticket.ready.queue")
+    @RabbitListener(queues = "${app.rabbitmq.queues.ticket-ready.name}")
     public void onTicketReady(TicketReadyEvent event) {
         log.info("Received ticket.ready event for orderId: {}", event.getId());
         orderService.onTicketReady(event.getId());

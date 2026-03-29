@@ -5,6 +5,7 @@ import com.restaurant.kitchen.enums.Station;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Setter
@@ -31,13 +32,16 @@ public class ChefProfile {
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private Station station;
+    @Builder.Default
+    private Station station = Station.UNASSIGNED;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private ChefStatus status;
+    @Builder.Default
+    private ChefStatus status = ChefStatus.ACTIVE;
 
     //Lazy to prevent loading all tickets unless explicitly accessed
     @OneToMany(mappedBy = "assignedChef" , fetch = FetchType.LAZY)
-    private List <KitchenTicket> assignedTickets ;
+    @Builder.Default
+    private List <KitchenTicket> assignedTickets = new ArrayList<>() ;
 }
