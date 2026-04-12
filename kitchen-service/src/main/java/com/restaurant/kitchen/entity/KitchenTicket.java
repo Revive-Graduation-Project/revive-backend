@@ -28,12 +28,8 @@ public class KitchenTicket {
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-<<<<<<< Updated upstream
-    private TicketStatus status ;
-=======
     @Builder.Default
     private TicketStatus status =  TicketStatus.PREPARING;
->>>>>>> Stashed changes
 
     // one chef can be assigned to many tickets
     // one ticket should be assigned to only one chef

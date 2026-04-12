@@ -60,7 +60,6 @@ public class TicketServiceImpl implements TicketService {
             KitchenTicket ticket = kitchenTicketRepository.save(
                     KitchenTicket.builder()  //manual fields setting is necessary therefore mapper is not used in this case
                             .orderId(event.getId())
-                            .status(TicketStatus.PENDING) // the initial state
                             .assignedChef(autoAssignChef())
                             .build()
             );
