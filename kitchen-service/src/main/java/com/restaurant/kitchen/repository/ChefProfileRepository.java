@@ -20,7 +20,7 @@ public interface ChefProfileRepository extends JpaRepository<ChefProfile, Long> 
 
     @Query("""
         SELECT c FROM ChefProfile c
-        LEFT JOIN c.assignedTickets t ON t.status != :ticketStatus
+        LEFT JOIN c.assignedTickets t ON t.status = :ticketStatus
         WHERE c.status = :chefStatus
         GROUP BY c
         ORDER BY COUNT(t) ASC
