@@ -52,7 +52,7 @@ class TicketServiceImplTest {
         OrderCreatedEvent event = new OrderCreatedEvent();
         event.setId(100L);
 
-        KitchenTicket existingTicket = buildTicket(TicketStatus.PENDING);
+        KitchenTicket existingTicket = buildTicket(TicketStatus.PREPARING);
         when(kitchenTicketRepository.findByOrderId(100L)).thenReturn(Optional.of(existingTicket));
 
         ticketService.createKitchenTicket(event, "corr-001", "saga-001");
@@ -70,10 +70,10 @@ class TicketServiceImplTest {
         availableChef.setId(10L);
 
         when(kitchenTicketRepository.findByOrderId(100L)).thenReturn(Optional.empty());
-        when(chefProfileRepository.findMostAvailableActiveChefs(ChefStatus.ACTIVE, TicketStatus.READY, PageRequest.of(0, 1)))
+        when(chefProfileRepository.findMostAvailableActiveChefs(ChefStatus.ACTIVE, TicketStatus.PREPARING, PageRequest.of(0, 1)))
                 .thenReturn(List.of(availableChef));
 
-        KitchenTicket savedTicket = buildTicket(TicketStatus.PENDING);
+        KitchenTicket savedTicket = buildTicket(TicketStatus.PREPARING);
         savedTicket.setId(1L);
         when(kitchenTicketRepository.save(any(KitchenTicket.class))).thenReturn(savedTicket);
 
@@ -89,7 +89,7 @@ class TicketServiceImplTest {
         event.setId(100L);
 
         when(kitchenTicketRepository.findByOrderId(100L)).thenReturn(Optional.empty());
-        when(chefProfileRepository.findMostAvailableActiveChefs(ChefStatus.ACTIVE, TicketStatus.READY, PageRequest.of(0, 1)))
+        when(chefProfileRepository.findMostAvailableActiveChefs(ChefStatus.ACTIVE, TicketStatus.PREPARING, PageRequest.of(0, 1)))
                 .thenReturn(List.of());
 
         assertThrows(RuntimeException.class, () -> ticketService.createKitchenTicket(event, "corr-001", "saga-001"));
@@ -102,22 +102,22 @@ class TicketServiceImplTest {
 
     @Test
     void shouldUpdateTicketStatusSuccessfully() {
-        KitchenTicket ticket = buildTicket(TicketStatus.PENDING);
-        KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.COOKING, 10L, LocalDateTime.now());
+        KitchenTicket ticket = buildTicket(TicketStatus.PREPARING);
+        KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.DONE, 10L, LocalDateTime.now());
 
         when(kitchenTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(ticketMapper.toDTO(ticket)).thenReturn(dto);
 
-        KitchenTicketDTO result = ticketService.updateTicketStatus(1L, TicketStatus.COOKING);
+        KitchenTicketDTO result = ticketService.updateTicketStatus(1L, TicketStatus.DONE);
 
-        assertEquals(TicketStatus.COOKING, ticket.getStatus());
-        assertEquals(TicketStatus.COOKING, result.status());
+        assertEquals(TicketStatus.DONE, ticket.getStatus());
+        assertEquals(TicketStatus.DONE, result.status());
         verify(kitchenTicketRepository, never()).save(any()); // uses dirty checking
     }
 
     @Test
     void shouldPublishTicketReadyEventWhenStatusIsReady() {
-        KitchenTicket ticket = buildTicket(TicketStatus.COOKING);
+        KitchenTicket ticket = buildTicket(TicketStatus.PREPARING);
         KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.READY, 10L, LocalDateTime.now());
 
         when(kitchenTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
@@ -130,13 +130,13 @@ class TicketServiceImplTest {
 
     @Test
     void shouldNotPublishEventWhenStatusIsNotReady() {
-        KitchenTicket ticket = buildTicket(TicketStatus.PENDING);
-        KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.COOKING, 10L, LocalDateTime.now());
+        KitchenTicket ticket = buildTicket(TicketStatus.PREPARING);
+        KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.DONE, 10L, LocalDateTime.now());
 
         when(kitchenTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(ticketMapper.toDTO(ticket)).thenReturn(dto);
 
-        ticketService.updateTicketStatus(1L, TicketStatus.COOKING);
+        ticketService.updateTicketStatus(1L, TicketStatus.DONE);
 
         verifyNoInteractions(publisher);
     }
@@ -156,21 +156,21 @@ class TicketServiceImplTest {
 
     @Test
     void shouldReturnActiveTicketsSuccessfully() {
-        KitchenTicket ticket = buildTicket(TicketStatus.COOKING);
-        KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.COOKING, 10L, LocalDateTime.now());
+        KitchenTicket ticket = buildTicket(TicketStatus.PREPARING);
+        KitchenTicketDTO dto = new KitchenTicketDTO(1L, 100L, TicketStatus.PREPARING, 10L, LocalDateTime.now());
 
-        when(kitchenTicketRepository.findByStatusNot(TicketStatus.READY)).thenReturn(List.of(ticket));
+        when(kitchenTicketRepository.findByStatusNot(TicketStatus.DONE)).thenReturn(List.of(ticket));
         when(ticketMapper.toDTOList(List.of(ticket))).thenReturn(List.of(dto));
 
         List<KitchenTicketDTO> result = ticketService.getActiveTickets();
 
         assertEquals(1, result.size());
-        assertEquals(TicketStatus.COOKING, result.get(0).status());
+        assertEquals(TicketStatus.PREPARING, result.get(0).status());
     }
 
     @Test
     void shouldReturnEmptyListWhenNoActiveTicketsExist() {
-        when(kitchenTicketRepository.findByStatusNot(TicketStatus.READY)).thenReturn(List.of());
+        when(kitchenTicketRepository.findByStatusNot(TicketStatus.DONE)).thenReturn(List.of());
         when(ticketMapper.toDTOList(List.of())).thenReturn(List.of());
 
         List<KitchenTicketDTO> result = ticketService.getActiveTickets();
