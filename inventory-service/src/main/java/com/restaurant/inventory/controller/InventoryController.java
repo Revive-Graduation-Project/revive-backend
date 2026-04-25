@@ -12,14 +12,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/menu")
+@RequestMapping("/api/Inventory")
 @Slf4j
 @RequiredArgsConstructor
-public class MenuController {
+public class InventoryController {
 
     private final MenuCsvService menuCsvService;
 
