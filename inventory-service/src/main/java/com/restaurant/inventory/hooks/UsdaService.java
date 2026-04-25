@@ -130,10 +130,10 @@ public class UsdaService {
                                                                         .filter(n -> RELEVANT_NUTRIENTS
                                                                                         .contains(n.nutrientName()))
                                                                         .filter(n -> !(n.nutrientName().equals("Energy")
-                                                                                        && n.unitName().equals("kJ")))
+                                                                                        && n.unitName().equals("kJ"))) // exclude kJ
                                                                         .toList();
 
-                                        return new UsdaFoodDetail(searchResult.fdcId(), description, nutrients);
+                                        return new UsdaFoodDetail(searchResult.fdcId(), searchResult.originalName(), description, nutrients);
                                 })
                                 .filter(f -> f != null)
                                 .toList();

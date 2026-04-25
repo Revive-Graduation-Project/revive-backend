@@ -196,12 +196,20 @@ services:
     container_name: inventory-service
     ports:
       - "8083:8080"
+    env_file:
+      - inventory-service/.env
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-db:5432/inventory_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
       inventory-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - restaurant-net
@@ -217,8 +225,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://menu-db:5432/menu_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
       menu-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - restaurant-net

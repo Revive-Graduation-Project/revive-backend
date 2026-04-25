@@ -67,22 +67,24 @@ public class CsvParserHelper {
     }
 
     /**
-     * Builds on top of parse() to return a meal → ingredients map.
-     * Keys are meal names, values are lists of IngredientEntry DTOs
-     * containing the ingredient name, quantity, and unit.
+     * Builds on top of parse() to return a meal → parsed meal data map.
+     * Keys are meal names, values are MealCsvEntry objects containing
+     * the ingredient list, category, and price.
      *
      * @param file the uploaded CSV file
-     * @return LinkedHashMap of meal name to ingredient entries
+     * @return LinkedHashMap of meal name to MealCsvEntry
      */
-    public LinkedHashMap<String, List<IngredientEntry>> parseMenu(MultipartFile file) {
+    public LinkedHashMap<String, MealCsvEntry> parseMenu(MultipartFile file) {
         List<Map<String, String>> rows = parse(file);
-        LinkedHashMap<String, List<IngredientEntry>> menuMap = new LinkedHashMap<>();
+        LinkedHashMap<String, MealCsvEntry> menuMap = new LinkedHashMap<>();
 
         for (Map<String, String> row : rows) {
             String mealName = row.get("meal_name");
             String ingredient = row.get("ingredient");
             String quantityRaw = row.get("quantity");
             String unit = row.get("unit");
+            String category = row.getOrDefault("category", "Uncategorized");
+            String priceRaw = row.getOrDefault("price", "0");
 
             if (mealName == null || mealName.isBlank()) {
                 log.warn("Skipping row with missing meal_name");
@@ -100,15 +102,32 @@ public class CsvParserHelper {
                 log.warn("Invalid quantity '{}' for ingredient '{}', defaulting to 0", quantityRaw, ingredient);
             }
 
+            double price = 0;
+            try {
+                price = Double.parseDouble(priceRaw.trim());
+            } catch (Exception e) {
+                log.warn("Invalid price '{}' for meal '{}', defaulting to 0", priceRaw, mealName);
+            }
+
             IngredientEntry entry = new IngredientEntry(
                     ingredient.trim(),
                     quantity,
                     unit == null ? "" : unit.trim());
-            menuMap.computeIfAbsent(mealName, k -> new ArrayList<>()).add(entry);
+
+            double finalPrice = price;
+            MealCsvEntry mealEntry = menuMap.computeIfAbsent(mealName, k ->
+                    new MealCsvEntry(new ArrayList<>(), category.trim(), finalPrice));
+            mealEntry.ingredients().add(entry);
         }
 
         log.debug("CsvParserHelper: parsed {} meals from CSV", menuMap.size());
         return menuMap;
+    }
+
+    /**
+     * Holds the parsed CSV data for a single meal.
+     */
+    public record MealCsvEntry(List<IngredientEntry> ingredients, String category, double price) {
     }
 
     public void validateFile(MultipartFile file) {

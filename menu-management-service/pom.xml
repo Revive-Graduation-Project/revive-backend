@@ -15,4 +15,11 @@
 	<name>menu-management-service</name>
 	<description>Menu and meal management service</description>
 
+	<dependencies>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+	</dependencies>
+
 </project>
