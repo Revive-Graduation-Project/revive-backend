@@ -2,6 +2,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "MenuManagementServiceApplication",
+            "request": "launch",
+            "mainClass": "com.restaurant.menu.MenuManagementServiceApplication",
+            "projectName": "menu-management-service"
+        },
+        {
+            "type": "java",
             "name": "Spring Boot-Application<inventory-service>",
             "request": "launch",
             "cwd": "${workspaceFolder}",

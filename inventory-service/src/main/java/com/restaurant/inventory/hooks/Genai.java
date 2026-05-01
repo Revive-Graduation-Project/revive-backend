@@ -69,7 +69,7 @@ public class Genai {
                                         .build();
 
                         GenerateContentResponse response = client.models.generateContent(
-                                        "gemini-2.5-flash-lite",
+                                        "gemini-flash-lite-latest",
                                         prompt,
                                         config);
 

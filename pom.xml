@@ -27,6 +27,7 @@
         <module>kitchen-service</module>
         <module>menu-management-service</module>
         <module>order-service</module>
+        <module>gateway-service</module>
     </modules>
 
     <!-- Shared properties inherited by all children -->

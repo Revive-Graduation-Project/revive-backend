@@ -48,13 +48,8 @@ public class Meal {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-            name = "meal_ingredients",
-            joinColumns = @JoinColumn(name = "meal_id"),
-            inverseJoinColumns = @JoinColumn(name = "ingredient_id")
-    )
-    private List<Ingredient> ingredients;
+    @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<MealIngredient> mealIngredients;
 
     @PrePersist
     protected void onCreate() {

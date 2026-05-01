@@ -147,15 +147,35 @@ services:
       retries: 5
 
   # ─────────────────────────────────────────────
-  # Spring Boot Microservices
+  # API Gateway (ONLY exposed port to the outside)
+  # ─────────────────────────────────────────────
+  gateway-service:
+    build:
+      context: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"          # the ONLY port exposed to the host
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    depends_on:
+      - auth-service
+      - client-service
+      - inventory-service
+      - menu-management-service
+      - order-service
+      - kitchen-service
+    networks:
+      - restaurant-net
+
+  # ─────────────────────────────────────────────
+  # Spring Boot Microservices (internal only)
   # ─────────────────────────────────────────────
   auth-service:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
     container_name: auth-service
-    ports:
-      - "8081:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://auth-db:5432/auth_db
       SPRING_DATASOURCE_USERNAME: postgres
@@ -177,8 +197,7 @@ services:
       context: .
       dockerfile: client-service/Dockerfile
     container_name: client-service
-    ports:
-      - "8082:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://client-db:5432/client_db
       SPRING_DATASOURCE_USERNAME: postgres
@@ -194,8 +213,7 @@ services:
       context: .
       dockerfile: inventory-service/Dockerfile
     container_name: inventory-service
-    ports:
-      - "8083:8080"
+    # no ports: — only reachable via gateway on Docker network
     env_file:
       - inventory-service/.env
     environment:
@@ -219,8 +237,7 @@ services:
       context: .
       dockerfile: menu-management-service/Dockerfile
     container_name: menu-management-service
-    ports:
-      - "8084:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://menu-db:5432/menu_db
       SPRING_DATASOURCE_USERNAME: postgres
@@ -242,8 +259,7 @@ services:
       context: .
       dockerfile: order-service/Dockerfile
     container_name: order-service
-    ports:
-      - "8085:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://order-db:5432/order_db
       SPRING_DATASOURCE_USERNAME: postgres
@@ -259,8 +275,7 @@ services:
       context: .
       dockerfile: kitchen-service/Dockerfile
     container_name: kitchen-service
-    ports:
-      - "8086:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://kitchen-db:5432/kitchen_db
       SPRING_DATASOURCE_USERNAME: postgres

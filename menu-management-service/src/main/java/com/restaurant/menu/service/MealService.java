@@ -22,4 +22,14 @@ public interface MealService {
      * Retrieves a single meal by its ID.
      */
     MealDTO getMealById(Long id);
+
+    /**
+     * Retrieves multiple meals by their IDs in a single query.
+     * Any ID not found in the database is silently omitted from the result.
+     *
+     * @param ids list of meal IDs to fetch
+     * @return list of matching MealDTOs
+     */
+    List<MealDTO> getMealsByIds(List<Long> ids);
 }
+

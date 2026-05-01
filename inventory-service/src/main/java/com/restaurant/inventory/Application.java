@@ -4,11 +4,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
-
-import com.google.genai.Client;
-import com.google.genai.types.GenerateContentResponse;
-import com.restaurant.inventory.hooks.Genai;
-
 import io.github.cdimascio.dotenv.Dotenv;
 
 @SpringBootApplication(exclude = {
