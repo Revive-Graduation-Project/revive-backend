@@ -35,9 +35,9 @@ usda:
 
 app:
   keys:
-    google: ${GOOGLE_API_KEY:}
-    deepseek: ${DEEPSEEK_API_KEY:sk-0e23be7d6f104c5ca0096da618b33cca}
-    openrouter: ${OPENROUTER_API_KEY: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}
+    google: AIzaSyCwLohG8kbgEA8nZg-qIY59h0ULagj7Co4
+    deepseek: sk-0e23be7d6f104c5ca0096da618b33cca
+    openrouter: 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
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
