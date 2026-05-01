@@ -1,5 +1,10 @@
-server:
-  port: 8080
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  GATEWAY-SERVICE — Multi-Environment Configuration                         ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, distinct service ports)        ║
+# ║  dev      → Docker Compose run  (container hostnames, port 8080)           ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
 
 spring:
   application:
@@ -8,45 +13,44 @@ spring:
   cloud:
     gateway:
       routes:
-
         # ── Auth Service (login, signup) ───────────────────────────────
         - id: auth-service
-          uri: http://auth-service:8080
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/auth/**
 
         # ── Menu Management Service (menu + ingredients) ───────────────
         - id: menu-service-menu
-          uri: http://menu-management-service:8080
+          uri: ${MENU_SERVICE_URL:http://localhost:8084}
           predicates:
             - Path=/api/menu/**
 
         - id: menu-service-ingredients
-          uri: http://menu-management-service:8080
+          uri: ${MENU_SERVICE_URL:http://localhost:8084}
           predicates:
             - Path=/api/ingredients/**
 
         # ── Kitchen Service ────────────────────────────────────────────
         - id: kitchen-service
-          uri: http://kitchen-service:8080
+          uri: ${KITCHEN_SERVICE_URL:http://localhost:8086}
           predicates:
             - Path=/api/kitchen/**
 
         # ── Inventory Service ──────────────────────────────────────────
         - id: inventory-service
-          uri: http://inventory-service:8080
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/inventory/**
 
         # ── Order Service ──────────────────────────────────────────────
         - id: order-service
-          uri: http://order-service:8080
+          uri: ${ORDER_SERVICE_URL:http://localhost:8085}
           predicates:
             - Path=/api/orders/**
 
         # ── Client Service ─────────────────────────────────────────────
         - id: client-service
-          uri: http://client-service:8080
+          uri: ${CLIENT_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/clients/**
 
@@ -61,3 +65,107 @@ management:
     web:
       exposure:
         include: health
+
+server:
+  port: 8080
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run (uses env-var defaults above)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/auth/**
+
+        - id: menu-service-menu
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/menu/**
+
+        - id: menu-service-ingredients
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/ingredients/**
+
+        - id: kitchen-service
+          uri: http://kitchen-service:8080
+          predicates:
+            - Path=/api/kitchen/**
+
+        - id: inventory-service
+          uri: http://inventory-service:8080
+          predicates:
+            - Path=/api/inventory/**
+
+        - id: order-service
+          uri: http://order-service:8080
+          predicates:
+            - Path=/api/orders/**
+
+        - id: client-service
+          uri: http://client-service:8080
+          predicates:
+            - Path=/api/clients/**
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL}
+          predicates:
+            - Path=/auth/**
+
+        - id: menu-service-menu
+          uri: ${MENU_SERVICE_URL}
+          predicates:
+            - Path=/api/menu/**
+
+        - id: menu-service-ingredients
+          uri: ${MENU_SERVICE_URL}
+          predicates:
+            - Path=/api/ingredients/**
+
+        - id: kitchen-service
+          uri: ${KITCHEN_SERVICE_URL}
+          predicates:
+            - Path=/api/kitchen/**
+
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL}
+          predicates:
+            - Path=/api/inventory/**
+
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL}
+          predicates:
+            - Path=/api/orders/**
+
+        - id: client-service
+          uri: ${CLIENT_SERVICE_URL}
+          predicates:
+            - Path=/api/clients/**
+
+server:
+  port: ${PORT:8080}

@@ -15,5 +15,6 @@ FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy
 WORKDIR /app
 COPY --from=builder /app/inventory-service/target/*.jar app.jar
 EXPOSE 8080
+ENV SPRING_PROFILES_ACTIVE=dev
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
