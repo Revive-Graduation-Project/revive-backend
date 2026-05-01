@@ -17,6 +17,6 @@ public record BulkUpdateStockRequest(
 
             @NotNull(message = "Stock quantity is required")
             @PositiveOrZero(message = "Stock cannot be negative")
-            Integer stock) {
+            Double stock) { // in grams
     }
 }

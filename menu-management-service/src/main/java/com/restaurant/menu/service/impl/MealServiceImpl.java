@@ -6,6 +6,7 @@ import com.restaurant.menu.dto.MealNutrition;
 import com.restaurant.menu.dto.NutrientInfo;
 import com.restaurant.menu.entity.Ingredient;
 import com.restaurant.menu.entity.Meal;
+import com.restaurant.menu.entity.MealIngredient;
 import com.restaurant.menu.event.MenuNutritionEvent;
 import com.restaurant.menu.exception.MealNotFoundException;
 import com.restaurant.menu.mapper.MealMapper;
@@ -16,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,16 +37,31 @@ public class MealServiceImpl implements MealService {
         log.info("Processing nutrition data for {} meals", event.meals().size());
 
         for (MealNutrition mealNutrition : event.meals()) {
-            
-            List<Ingredient> mealIngredients = new ArrayList<>();
             Map<String, NutrientInfo> aggregatedNutrients = new LinkedHashMap<>();
 
-            for (IngredientNutrition ingDto : mealNutrition.ingredients()) {
-                // 1. Resolve Ingredient Entity via the IngredientService
-                Ingredient ingredient = ingredientService.resolveOrSaveIngredient(ingDto);
-                mealIngredients.add(ingredient);
+            // 1. Resolve Meal first (or prepare for creation)
+            Meal meal = mealRepository.findByName(mealNutrition.mealName())
+                    .orElseGet(() -> Meal.builder()
+                            .name(mealNutrition.mealName())
+                            .isActive(true)
+                            .build());
 
-                // 2. Aggregate Nutrients for the Meal
+            meal.setCategory(mealNutrition.category());
+            meal.setPrice(mealNutrition.price());
+
+            List<MealIngredient> mealIngredients = new ArrayList<>();
+
+            for (IngredientNutrition ingDto : mealNutrition.ingredients()) {
+                // Resolve Ingredient Entity
+                Ingredient ingredient = ingredientService.resolveOrSaveIngredient(ingDto);
+
+                mealIngredients.add(MealIngredient.builder()
+                        .meal(meal)
+                        .ingredient(ingredient)
+                        .quantityGrams(ingDto.quantity())
+                        .build());
+
+                // Aggregate Nutrients
                 for (NutrientInfo nutrient : ingDto.nutrients()) {
                     aggregatedNutrients.merge(
                             nutrient.nutrientName() + "_" + nutrient.unitName(),
@@ -66,27 +81,15 @@ public class MealServiceImpl implements MealService {
                             "unitName", n.unitName()))
                     .toList();
 
-            // 3. Upsert Meal
-            Meal meal = mealRepository.findByName(mealNutrition.mealName())
-                    .map(existing -> {
-                        existing.setNutrients(finalMealNutrients);
-                        existing.setIngredients(mealIngredients);
-                        existing.setCategory(mealNutrition.category());
-                        existing.setPrice(mealNutrition.price());
-                        log.info("Updating existing meal: '{}'", mealNutrition.mealName());
-                        return existing;
-                    })
-                    .orElseGet(() -> {
-                        log.info("Creating new meal: '{}'", mealNutrition.mealName());
-                        return Meal.builder()
-                                .name(mealNutrition.mealName())
-                                .nutrients(finalMealNutrients)
-                                .ingredients(mealIngredients)
-                                .price(mealNutrition.price())
-                                .category(mealNutrition.category())
-                                .isActive(true)
-                                .build();
-                    });
+            meal.setNutrients(finalMealNutrients);
+
+            // Set ingredients - orphanRemoval=true in Meal entity will handle old ones
+            if (meal.getMealIngredients() != null) {
+                meal.getMealIngredients().clear();
+                meal.getMealIngredients().addAll(mealIngredients);
+            } else {
+                meal.setMealIngredients(mealIngredients);
+            }
 
             mealRepository.save(meal);
         }
@@ -109,5 +112,12 @@ public class MealServiceImpl implements MealService {
         Meal meal = mealRepository.findById(id)
                 .orElseThrow(() -> new MealNotFoundException(id));
         return mealMapper.toDTO(meal);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MealDTO> getMealsByIds(List<Long> ids) {
+        log.info("Fetching meals by ids: {}", ids);
+        return mealMapper.toDTOList(mealRepository.findAllById(ids));
     }
 }

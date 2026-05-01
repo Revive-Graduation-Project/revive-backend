@@ -11,6 +11,7 @@ import com.restaurant.inventory.dto.NutrientInfo;
 import com.restaurant.inventory.dto.UsdaFoodDetail;
 import com.restaurant.inventory.event.MenuNutritionEvent;
 import com.restaurant.inventory.helper.CsvParserHelper;
+import com.restaurant.inventory.hooks.OpenRouter;
 import com.restaurant.inventory.hooks.Genai;
 import com.restaurant.inventory.hooks.UsdaService;
 import com.restaurant.inventory.messaging.MenuNutritionPublisher;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 public class MenuCsvService {
 
     private final CsvParserHelper csvParserHelper;
-    private final Genai genai;
+    private final OpenRouter agent;
     private final UsdaService usdaService;
     private final MenuNutritionPublisher menuNutritionPublisher;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -41,13 +42,13 @@ public class MenuCsvService {
      * batch is aborted and no event is published to RabbitMQ.
      *
      * Steps per meal:
-     *   1. Call AI  → get USDA search params (normalized ingredient names)
-     *   2. Search USDA → get food IDs (fdcIds)
-     *   3. Fetch nutritions by IDs
-     *   4. Group ingredients and their nutrition together
+     * 1. Call AI → get USDA search params (normalized ingredient names)
+     * 2. Search USDA → get food IDs (fdcIds)
+     * 3. Fetch nutritions by IDs
+     * 4. Group ingredients and their nutrition together
      *
      * Final step (once for entire batch):
-     *   5. Publish the MenuNutritionEvent to RabbitMQ
+     * 5. Publish the MenuNutritionEvent to RabbitMQ
      */
     public List<MealNutrition> getMenuNutritions(MultipartFile file) {
         csvParserHelper.validateFile(file);
@@ -56,13 +57,33 @@ public class MenuCsvService {
         List<MealNutrition> result = new ArrayList<>();
 
         try {
+            // ── Step 0: Batch AI Normalization ────────────────
+            log.info("Batching AI normalizer for all ingredients...");
+            List<String> allUniqueIngredients = menuMap.values().stream()
+                    .flatMap(meal -> meal.ingredients().stream())
+                    .map(IngredientEntry::name)
+                    .distinct()
+                    .toList();
+
+            final Map<String, NormalizedIngredient> normalizedCache = allUniqueIngredients.isEmpty() 
+                    ? Map.of() 
+                    : batchNormalizeIngredients(allUniqueIngredients);
+
+            if (!normalizedCache.isEmpty()) {
+                log.info("Successfully normalized {} unique ingredients via AI", normalizedCache.size());
+            }
+
             for (var entry : menuMap.entrySet()) {
                 String mealName = entry.getKey();
                 CsvParserHelper.MealCsvEntry mealCsvEntry = entry.getValue();
                 List<IngredientEntry> ingredients = mealCsvEntry.ingredients();
 
-                // ── Step 1: Call AI to get USDA search params ────────────────
-                List<NormalizedIngredient> normalized = normalizeIngredients(mealName, ingredients);
+                // ── Step 1: Get USDA search params from cache ────────────────
+                List<NormalizedIngredient> normalized = ingredients.stream()
+                        .map(i -> normalizedCache.getOrDefault(i.name(),
+                                // Fallback if AI missed it
+                                new NormalizedIngredient(i.name(), i.name())))
+                        .toList();
 
                 // ── Step 2 & 3: Search USDA for IDs → fetch nutritions ───────
                 Map<String, Double> quantityMap = ingredients.stream()
@@ -77,15 +98,14 @@ public class MenuCsvService {
                             .filter(i -> i.name().equals(food.originalName()))
                             .findFirst()
                             .orElse(new IngredientEntry(food.originalName(), 0, ""));
-                            
+
                     return new IngredientNutrition(
                             food.originalName(),
                             originalEntry.quantity(),
                             originalEntry.unit(),
                             food.fdcId(),
                             food.description(),
-                            food.foodNutrients()
-                    );
+                            food.foodNutrients());
                 }).toList();
 
                 MealNutrition mealNutrition = new MealNutrition(
@@ -113,22 +133,48 @@ public class MenuCsvService {
     // ───────────────────────── private helpers ─────────────────────────
 
     /**
-     * Step 1 – call Gemini AI to normalize ingredient names into USDA search terms.
+     * Step 0 – call AI to normalize all unique ingredient names in the batch.
+     * To prevent LLM hallucinations on large lists, we process them in chunks of
+     * 20.
      */
-    private List<NormalizedIngredient> normalizeIngredients(String mealName, List<IngredientEntry> ingredients) {
-        String prompt = ingredients.stream()
-                .map(IngredientEntry::name)
-                .collect(Collectors.joining(", "));
+    private Map<String, NormalizedIngredient> batchNormalizeIngredients(List<String> uniqueIngredients) {
+        Map<String, NormalizedIngredient> resultMap = new java.util.HashMap<>();
+        int chunkSize = 20;
 
-        String aiResponse = genai.aiMenuNormalizer(prompt);
-        if (aiResponse == null || aiResponse.isBlank()) {
-            throw new RuntimeException("Gemini returned no response for meal: " + mealName);
-        }
+        for (int i = 0; i < uniqueIngredients.size(); i += chunkSize) {
+            int end = Math.min(uniqueIngredients.size(), i + chunkSize);
+            List<String> chunk = uniqueIngredients.subList(i, end);
+            String prompt = String.join(", ", chunk);
 
-        try {
-            return objectMapper.readValue(aiResponse, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to parse AI JSON for meal '" + mealName + "'", e);
+            String aiResponse = agent.aiMenuNormalizer(prompt);
+            if (aiResponse == null || aiResponse.isBlank()) {
+                log.error("AI returned no response for chunk {} to {}", i, end);
+                continue; // Skip chunk on failure or throw exception
+            }
+
+            // Defensively strip markdown formatting
+            String cleanJson = aiResponse.trim();
+            if (cleanJson.startsWith("```json")) {
+                cleanJson = cleanJson.substring(7);
+            } else if (cleanJson.startsWith("```")) {
+                cleanJson = cleanJson.substring(3);
+            }
+            if (cleanJson.endsWith("```")) {
+                cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
+            }
+            cleanJson = cleanJson.trim();
+
+            try {
+                List<NormalizedIngredient> parsed = objectMapper.readValue(cleanJson, new TypeReference<>() {
+                });
+                for (NormalizedIngredient item : parsed) {
+                    resultMap.put(item.originalName(), item);
+                }
+            } catch (JsonProcessingException e) {
+                log.error("Failed to parse AI JSON for chunk. Raw response: {}", aiResponse, e);
+                throw new RuntimeException("Failed to parse AI JSON for batch chunk. Raw response: " + aiResponse, e);
+            }
         }
+        return resultMap;
     }
 }
