@@ -1,0 +1,17 @@
+implementation flow for the inventory service,
+
+1 - import menu csv
+
+2 - parse csv into json objects
+
+3 - send json objects to an ai model
+
+4 - get a response from the ai model that turns the json objects into search params for the USDA api
+
+5 - send bulk request for the USDA api
+
+6 - get every meal nutrients and store it into an array
+
+7 - fire an event using this array
+
+8 - menu service listens to the event and writes the data in the array of objects 

@@ -1,0 +1,63 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway-service
+
+  cloud:
+    gateway:
+      routes:
+
+        # ── Auth Service (login, signup) ───────────────────────────────
+        - id: auth-service
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/auth/**
+
+        # ── Menu Management Service (menu + ingredients) ───────────────
+        - id: menu-service-menu
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/menu/**
+
+        - id: menu-service-ingredients
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/ingredients/**
+
+        # ── Kitchen Service ────────────────────────────────────────────
+        - id: kitchen-service
+          uri: http://kitchen-service:8080
+          predicates:
+            - Path=/api/kitchen/**
+
+        # ── Inventory Service ──────────────────────────────────────────
+        - id: inventory-service
+          uri: http://inventory-service:8080
+          predicates:
+            - Path=/api/inventory/**
+
+        # ── Order Service ──────────────────────────────────────────────
+        - id: order-service
+          uri: http://order-service:8080
+          predicates:
+            - Path=/api/orders/**
+
+        # ── Client Service ─────────────────────────────────────────────
+        - id: client-service
+          uri: http://client-service:8080
+          predicates:
+            - Path=/api/clients/**
+
+# ── Shared JWT secret (MUST match auth-service's app.jwt.secret) ───────
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+# ── Actuator ───────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

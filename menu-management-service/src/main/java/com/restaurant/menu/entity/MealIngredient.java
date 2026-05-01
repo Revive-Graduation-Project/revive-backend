@@ -1,41 +1,38 @@
 package com.restaurant.menu.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.util.UUID;
+import lombok.*;
 
 /**
- * Junction table linking a Meal to ingredients from the inventory-service.
- * Since ingredients live in a separate service/database, we store only the
- * UUID reference (ingredientId) instead of a real @ManyToMany JPA join.
+ * Explicit join entity for the meal_ingredients table.
+ * Replaces the implicit @ManyToMany so we can store the quantity (in grams)
+ * of each ingredient used per serving of the meal.
  */
 @Entity
 @Table(name = "meal_ingredients")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class MealIngredient {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    // Many MealIngredients belong to one Meal (within this DB)
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "meal_id", nullable = false)
     private Meal meal;
 
-    // Cross-service reference to inventory-service's Ingredient (UUID only — no FK constraint)
-    @Column(name = "ingredient_id", nullable = false)
-    private UUID ingredientId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
 
-    // Quantity of this ingredient used in the meal, in grams
-    @Column(nullable = false)
+    /**
+     * How many grams of this ingredient are used per serving of the meal.
+     * e.g. a burger uses 150.0g of beef.
+     */
+    @Column(name = "quantity_grams", nullable = false)
     private Double quantityGrams;
 }

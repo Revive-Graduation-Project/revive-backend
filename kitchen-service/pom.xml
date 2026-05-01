@@ -14,5 +14,23 @@
 	<artifactId>kitchen-service</artifactId>
 	<name>kitchen-service</name>
 	<description>Kitchen order management service</description>
+    <dependencies>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>24.1.0</version> <!-- Specific, stable version -->
+            <scope>provided</scope> <!-- 'provided' is often better for annotations -->
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+    </dependencies>
 
 </project>

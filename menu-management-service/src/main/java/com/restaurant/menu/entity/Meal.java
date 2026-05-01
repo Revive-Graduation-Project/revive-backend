@@ -1,47 +1,64 @@
 package com.restaurant.menu.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
 @Entity
 @Table(name = "meals")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Meal {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+    /**
+     * Stores the full list of nutrients as a JSON column.
+     * Each entry has: nutrientName, value, unitName.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private List<Map<String, Object>> nutrients;
 
-    @Column(nullable = false)
-    private Double totalCalories;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @Column(nullable = false)
-    private Double totalProtein;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
-    @Column(nullable = false)
-    private Double totalCarbs;
+    @Column(name = "price", nullable = false)
+    private Double price;
 
-    @Column(nullable = false)
-    private Double totalFats;
+    @Column(name = "category", nullable = false)
+    private String category;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive;
 
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<MealIngredient> ingredients = new ArrayList<>();
+    private List<MealIngredient> mealIngredients;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

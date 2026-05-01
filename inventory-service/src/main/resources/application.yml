@@ -2,24 +2,26 @@ spring:
   application:
     name: inventory-service
 
-  datasource:
-    url: jdbc:postgresql://inventory-db:5432/inventory_db
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-
-  sql:
-    init:
-      mode: always
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 server:
   port: 8080
+
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      menu-nutrition:
+        name: menu.nutrition.processed.queue
+        routing-key: menu.nutrition.processed
+        dlq-name: menu.nutrition.processed.queue.dlq
+        dlq-routing-key: menu.nutrition.processed.dlq
