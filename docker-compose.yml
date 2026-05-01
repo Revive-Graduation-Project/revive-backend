@@ -169,6 +169,8 @@ services:
 
   # ─────────────────────────────────────────────
   # Spring Boot Microservices (internal only)
+  # All services use SPRING_PROFILES_ACTIVE=dev (set in Dockerfile)
+  # which configures container hostnames for DB and RabbitMQ.
   # ─────────────────────────────────────────────
   auth-service:
     build:
@@ -176,14 +178,6 @@ services:
       dockerfile: auth-service/Dockerfile
     container_name: auth-service
     # no ports: — only reachable via gateway on Docker network
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://auth-db:5432/auth_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
       auth-db:
         condition: service_healthy
@@ -198,10 +192,6 @@ services:
       dockerfile: client-service/Dockerfile
     container_name: client-service
     # no ports: — only reachable via gateway on Docker network
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://client-db:5432/client_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       client-db:
         condition: service_healthy
@@ -216,14 +206,6 @@ services:
     # no ports: — only reachable via gateway on Docker network
     env_file:
       - inventory-service/.env
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-db:5432/inventory_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -238,14 +220,6 @@ services:
       dockerfile: menu-management-service/Dockerfile
     container_name: menu-management-service
     # no ports: — only reachable via gateway on Docker network
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://menu-db:5432/menu_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
       menu-db:
         condition: service_healthy
@@ -260,10 +234,6 @@ services:
       dockerfile: order-service/Dockerfile
     container_name: order-service
     # no ports: — only reachable via gateway on Docker network
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://order-db:5432/order_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       order-db:
         condition: service_healthy
@@ -276,10 +246,6 @@ services:
       dockerfile: kitchen-service/Dockerfile
     container_name: kitchen-service
     # no ports: — only reachable via gateway on Docker network
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://kitchen-db:5432/kitchen_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       kitchen-db:
         condition: service_healthy

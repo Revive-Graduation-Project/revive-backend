@@ -45,4 +45,5 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
 ENV JAVA_OPTS="-Xss4m"
+ENV SPRING_PROFILES_ACTIVE=dev
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
