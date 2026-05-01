@@ -14,7 +14,7 @@ import java.util.Arrays;
 @Service
 public class Genai {
 
-        @Value("${GOOGLE_API_KEY}")
+        @Value("${app.keys.google}")
         private String apiKey;
 
         public String aiMenuNormalizer(String prompt) {

@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 @Service
 public class Deepseek {
 
-    @Value("${DEEPSEEK_API_KEY}")
+    @Value("${app.keys.deepseek}")
     private String apiKey;
 
     private final ObjectMapper objectMapper = new ObjectMapper();

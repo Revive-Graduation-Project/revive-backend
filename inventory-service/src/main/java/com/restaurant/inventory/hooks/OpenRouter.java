@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 @Service
 public class OpenRouter {
 
-    @Value("${OPENROUTER_API_KEY}")
+    @Value("${app.keys.openrouter}")
     private String apiKey;
 
     private final ObjectMapper objectMapper = new ObjectMapper();

@@ -33,12 +33,11 @@ usda:
     key: ${USDA_API_KEY:C8FAMk95THxyZi9f0XOn4ZqEG4G0cXOgusxh2gti}
     url: ${USDA_API_URL:https://api.nal.usda.gov/fdc/v1}
 
-GOOGLE_API_KEY: ${GOOGLE_API_KEY:}
-DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:sk-0e23be7d6f104c5ca0096da618b33cca}
-OPENROUTER_API_KEY: ${OPENROUTER_API_KEY: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}
-
-# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
+  keys:
+    google: ${GOOGLE_API_KEY:}
+    deepseek: ${DEEPSEEK_API_KEY:sk-0e23be7d6f104c5ca0096da618b33cca}
+    openrouter: ${OPENROUTER_API_KEY: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}
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
