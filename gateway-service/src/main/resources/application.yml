@@ -59,6 +59,23 @@ app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
 
+# ── Swagger UI / OpenAPI configuration ─────────────────────────────────
+springdoc:
+  swagger-ui:
+    urls:
+      - name: Auth Service
+        url: /auth/v3/api-docs
+      - name: Menu Management Service
+        url: /api/menu/v3/api-docs
+      - name: Kitchen Service
+        url: /api/kitchen/v3/api-docs
+      - name: Inventory Service
+        url: /api/inventory/v3/api-docs
+      - name: Order Service
+        url: /api/orders/v3/api-docs
+      - name: Client Service
+        url: /api/clients/v3/api-docs
+
 # ── Actuator ───────────────────────────────────────────────────────────
 management:
   endpoints:
@@ -169,3 +186,9 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

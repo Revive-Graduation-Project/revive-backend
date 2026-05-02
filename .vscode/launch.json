@@ -2,6 +2,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "AuthServiceApplication",
+            "request": "launch",
+            "mainClass": "com.restaurant.auth.AuthServiceApplication",
+            "projectName": "auth-service"
+        },
+        {
+            "type": "java",
             "name": "MenuManagementServiceApplication",
             "request": "launch",
             "mainClass": "com.restaurant.menu.MenuManagementServiceApplication",
