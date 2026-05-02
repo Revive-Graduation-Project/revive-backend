@@ -29,7 +29,7 @@ public class OrderItem {
     private Order order;
 
     @Column(name = "meal_id", nullable = false)
-    private UUID mealId;
+    private Long mealId;
 
     @Column(name = "snapshot_name", nullable = false)
     private String snapshotName;
@@ -39,16 +39,4 @@ public class OrderItem {
 
     @Column(nullable = false)
     private Integer quantity;
-
-    @Column(name = "snapshot_calories")
-    private Double snapshotCalories;
-
-    @Column(name = "snapshot_protein")
-    private Double snapshotProtein;
-
-    @Column(name = "snapshot_carbs")
-    private Double snapshotCarbs;
-
-    @Column(name = "snapshot_fats")
-    private Double snapshotFats;
 }

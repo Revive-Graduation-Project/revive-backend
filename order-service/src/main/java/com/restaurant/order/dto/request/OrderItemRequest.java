@@ -7,9 +7,8 @@ import java.util.UUID;
 
 public record OrderItemRequest(
         @NotNull(message = "Meal ID is required")
-        UUID mealId,
+        Long mealId,
 
-        @NotNull(message = "Quantity is required")
         @Min(value = 1, message = "Quantity must be at least 1")
-        Integer quantity
+        int quantity
 ) {}

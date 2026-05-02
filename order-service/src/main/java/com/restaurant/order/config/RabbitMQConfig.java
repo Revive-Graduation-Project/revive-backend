@@ -36,6 +36,34 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.queues.ticket-ready.routing-key}")
     private String ticketReadyRoutingKey;
 
+    // payment.succeeded — payment marks transaction success
+    @Value("${app.rabbitmq.queues.payment.succeeded.name}")
+    private String paymentSucceededQueue;
+
+    @Value("${app.rabbitmq.queues.payment-succeeded.routing-key}")
+    private String paymentSucceededRoutingKey;
+
+    // payment.failed — payment mark order transaction failure
+    @Value("${app.rabbitmq.queues.payment-failed.name}")
+    private String paymentFailedQueue;
+
+    @Value("${app.rabbitmq.queues.payment-failed.routing-key}")
+    private String paymentFailedRoutingKey;
+
+    // point-redemption.succeeded — response from client-service
+    @Value("${app.rabbitmq.queues.point-redemption-succeeded.name}")
+    private String pointRedemptionSucceededQueue;
+
+    @Value("${app.rabbitmq.queues.point-redemption-succeeded.routing-key}")
+    private String pointRedemptionSucceededRoutingKey;
+
+    // point-redemption.failed — response from client-service
+    @Value("${app.rabbitmq.queues.point-redemption-failed.name}")
+    private String pointRedemptionFailedQueue;
+
+    @Value("${app.rabbitmq.queues.point-redemption-failed.routing-key}")
+    private String pointRedemptionFailedRoutingKey;
+
     // --------- Converter ----------
     @Bean
     public MessageConverter converter() {
@@ -72,6 +100,22 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(ticketReadyQueue).build();
     }
 
+    @Bean
+    public Queue paymentSucceededQueue() {return QueueBuilder.durable(paymentSucceededQueue).build();}
+
+    @Bean
+    public Queue paymentFailedQueue() {return QueueBuilder.durable(paymentFailedQueue).build();}
+
+    @Bean
+    public Queue pointRedemptionSucceededQueue() {
+        return QueueBuilder.durable(pointRedemptionSucceededQueue).build();
+    }
+
+    @Bean
+    public Queue pointRedemptionFailedQueue() {
+        return QueueBuilder.durable(pointRedemptionFailedQueue).build();
+    }
+
     // --------- Bindings ----------
     @Bean
     public Binding bindingTicketCreatedQueue() {
@@ -95,5 +139,37 @@ public class RabbitMQConfig {
                 .bind(ticketReadyQueue())
                 .to(restaurantExchange())
                 .with(ticketReadyRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingPaymentSucceededQueue() {
+        return BindingBuilder
+                .bind(paymentSucceededQueue())
+                .to(restaurantExchange())
+                .with(paymentSucceededRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingPaymentFailedQueue() {
+        return BindingBuilder
+                .bind(paymentFailedQueue())
+                .to(restaurantExchange())
+                .with(paymentFailedRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingPointRedemptionSucceededQueue() {
+        return BindingBuilder
+                .bind(pointRedemptionSucceededQueue())
+                .to(restaurantExchange())
+                .with(pointRedemptionSucceededRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingPointRedemptionFailedQueue() {
+        return BindingBuilder
+                .bind(pointRedemptionFailedQueue())
+                .to(restaurantExchange())
+                .with(pointRedemptionFailedRoutingKey);
     }
 }

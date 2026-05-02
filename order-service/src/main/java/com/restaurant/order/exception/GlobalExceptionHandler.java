@@ -57,11 +57,19 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(e.getMessage(), Instant.now()));
     }
 
-    // 502 — inventory service communication failure
-    @ExceptionHandler(InventoryServiceException.class)
-    public ResponseEntity<ErrorResponse> handleInventoryServiceError(InventoryServiceException e) {
-        log.error("Inventory service error: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+    // 400 — Points reservation failure/Invalid points received
+    @ExceptionHandler(PointsException.class)
+    public ResponseEntity<ErrorResponse> handleInventoryServiceError(PointsException e) {
+        log.error("Points service error: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(e.getMessage(), Instant.now()));
+    }
+
+    // 400 — Payment failure
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentError(PaymentException e) {
+        log.error("Payment error: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(e.getMessage(), Instant.now()));
     }
 

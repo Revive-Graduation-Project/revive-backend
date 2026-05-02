@@ -1,4 +1,4 @@
-package com.restaurant.order.events;
+package com.restaurant.order.events.payments;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TicketReadyEvent {
-    private Long id;       // orderId
-    private Long ticketId;
+public class PaymentSucceededEvent {
+    private Long id; // orderId
 }

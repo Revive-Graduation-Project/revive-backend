@@ -20,7 +20,7 @@ spring:
 app:
   services:
     menu-url: http://localhost:8084
-    inventory-url: http://localhost:8083
+    customer-url: http://localhost:8085
 
   rabbitmq:
     exchange: restaurant.events.exchange
@@ -34,3 +34,11 @@ app:
       ticket-ready:
         name: ticket.ready.order.queue
         routing-key: ticket.ready
+
+      payment-succeeded:
+        name: payment.succeeded.queue
+        routing-key: payment.succeeded
+      payment-failed:
+        name: payment.failed.queue
+        routing-key: payment.failed
+

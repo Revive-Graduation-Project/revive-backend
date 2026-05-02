@@ -1,9 +1,7 @@
 package com.restaurant.order.mapper;
 
-import com.restaurant.order.dto.response.CustomOrderItemResponse;
 import com.restaurant.order.dto.response.OrderItemResponse;
 import com.restaurant.order.dto.response.OrderResponse;
-import com.restaurant.order.entity.CustomOrderItem;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import org.mapstruct.Mapper;
@@ -15,11 +13,7 @@ public interface OrderMapper {
 
     OrderItemResponse toItemResponse(OrderItem item);
 
-    CustomOrderItemResponse toCustomItemResponse(CustomOrderItem item);
-
     List<OrderItemResponse> toItemResponseList(List<OrderItem> items);
-
-    List<CustomOrderItemResponse> toCustomItemResponseList(List<CustomOrderItem> items);
 
     default OrderResponse toResponse(Order order) {
         if (order == null) return null;
@@ -29,13 +23,9 @@ public interface OrderMapper {
                 order.getCustomerId(),
                 order.getStatus(),
                 order.getTotalPrice(),
-                order.getTotalCalories(),
-                order.getTotalProtein(),
-                order.getTotalCarbs(),
-                order.getTotalFats(),
+                order.getDiscount(),
                 order.getCreatedAt(),
-                toItemResponseList(order.getItems()),
-                toCustomItemResponseList(order.getCustomItems())
+                toItemResponseList(order.getItems())
         );
     }
 }

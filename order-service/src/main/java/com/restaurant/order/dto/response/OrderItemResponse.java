@@ -5,12 +5,8 @@ import java.util.UUID;
 
 public record OrderItemResponse(
         Long id,
-        UUID mealId,
+        Long mealId,
         String snapshotName,
         BigDecimal snapshotPrice,
-        Integer quantity,
-        Double snapshotCalories,
-        Double snapshotProtein,
-        Double snapshotCarbs,
-        Double snapshotFats
+        Integer quantity
 ) {}

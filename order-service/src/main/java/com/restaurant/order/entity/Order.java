@@ -39,17 +39,9 @@ public class Order {
     @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
 
-    @Column(name = "total_calories")
-    private Double totalCalories;
-
-    @Column(name = "total_protein")
-    private Double totalProtein;
-
-    @Column(name = "total_carbs")
-    private Double totalCarbs;
-
-    @Column(name = "total_fats")
-    private Double totalFats;
+    @Column(name = "discount_percentage")
+    @Builder.Default
+    private Integer discount = 0;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false)
@@ -58,8 +50,4 @@ public class Order {
     @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CustomOrderItem> customItems = new ArrayList<>();
 }

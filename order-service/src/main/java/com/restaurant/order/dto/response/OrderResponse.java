@@ -11,11 +11,7 @@ public record OrderResponse(
         Long customerId,
         OrderStatus status,
         BigDecimal totalPrice,
-        Double totalCalories,
-        Double totalProtein,
-        Double totalCarbs,
-        Double totalFats,
+        Integer discount,
         LocalDateTime createdAt,
-        List<OrderItemResponse> items,
-        List<CustomOrderItemResponse> customItems
+        List<OrderItemResponse> items
 ) {}

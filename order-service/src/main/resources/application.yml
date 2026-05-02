@@ -58,7 +58,18 @@ app:
       ticket-ready:
         name: ticket.ready.queue
         routing-key: ticket.ready
+      payment-succeeded:
+        name: payment.succeeded.queue
+        routing-key: payment.succeeded
+      payment-failed:
+        name: payment.failed.queue
+        routing-key: payment.failed
+      point-redemption-succeeded:
+        name: point.redemption.succeeded.queue
+        routing-key: point-redemption.succeeded
+      point-redemption-failed:
+        name: point.redemption.failed.queue
+        routing-key: point-redemption.failed
 
   services:
     menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
-    inventory-url: ${INVENTORY_SERVICE_URL:http://inventory-service:8080}

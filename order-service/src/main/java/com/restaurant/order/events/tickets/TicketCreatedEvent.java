@@ -1,4 +1,4 @@
-package com.restaurant.order.events;
+package com.restaurant.order.events.tickets;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

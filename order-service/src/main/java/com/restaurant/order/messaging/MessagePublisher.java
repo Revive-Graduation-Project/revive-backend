@@ -1,12 +1,17 @@
 package com.restaurant.order.messaging;
 
 import com.restaurant.order.events.OrderCreatedEvent;
+import com.restaurant.order.events.payments.PaymentRequestedEvent;
+import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
+import com.restaurant.order.events.points.RewardPointsEarnedEvent;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -21,6 +26,22 @@ public class MessagePublisher {
     public void publishOrderCreated(OrderCreatedEvent event, String sagaId, String correlationId) {
         send("order.created", event, sagaId, correlationId);
         log.info("Order created event published for orderId: {}", event.getId());
+    }
+
+    public void publishPaymentRequested(PaymentRequestedEvent event, String sagaId, String correlationId) {
+        send("payment.requested", event, sagaId, correlationId);
+        log.info("Payment requested event published for orderId: {}", event.getId());
+    }
+
+    public void publishPointRedemptionRequested(PointRedemptionRequestedEvent event, String sagaId, String correlationId) {
+        send("points.redemption.requested", event, sagaId, correlationId);
+        log.info("Point redemption requested event published for orderId: {}", event.getId());
+    }
+
+    public void publishRewardPointsEarned(RewardPointsEarnedEvent event) {
+        // Simple fire and forget for rewarding
+        send("points.earned", event, null, UUID.randomUUID().toString());
+        log.info("Reward points earned event published for orderId: {}, points: {}", event.getId(), event.getPoints());
     }
 
     private void send(String routingKey, Object payload, @Nullable String sagaId, String correlationId) {

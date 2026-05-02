@@ -1,31 +1,27 @@
 package com.restaurant.order.service;
 
-import com.restaurant.order.dto.request.CustomOrderItemRequest;
+import com.restaurant.order.client.MenuClient;
 import com.restaurant.order.dto.request.OrderItemRequest;
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
-import com.restaurant.order.dto.snapshot.CustomIngredientSnapshot;
-import com.restaurant.order.dto.snapshot.MealSnapshot;
+import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.enums.OrderStatus;
-import com.restaurant.order.events.OrderCreatedEvent;
+import com.restaurant.order.exception.PointsException;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.messaging.MessagePublisher;
 import com.restaurant.order.repository.OrderRepository;
-import com.restaurant.order.service.impl.MealProcessor;
-import com.restaurant.order.service.impl.CustomIngredientProcessor;
 import com.restaurant.order.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,34 +31,21 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceImplTest {
 
-    @Mock
-    private OrderRepository orderRepository;
-
-    @Mock
-    private MessagePublisher messagePublisher;
-
-    @Mock
-    private OrderMapper orderMapper;
-
+    @Mock private OrderRepository orderRepository;
+    @Mock private MessagePublisher messagePublisher;
+    @Mock private OrderMapper orderMapper;
     @Mock private OrderCalculator orderCalculator;
-    @Mock private List<ProductProcessor<?>> processors;
-    @Mock private com.restaurant.order.client.InventoryClient inventoryClient;
-    @Mock private com.restaurant.order.client.MenuClient menuClient;
-    @Mock private MealProcessor mealProcessor;
-    @Mock private CustomIngredientProcessor customProcessor;
+    @Mock private MenuClient menuClient;
 
     private OrderServiceImpl orderService;
 
     @BeforeEach
     void setUp() {
-        // Manually initialize to handle the List of processors and the new calculator
         orderService = new OrderServiceImpl(
-                orderRepository, 
-                messagePublisher, 
-                orderMapper, 
-                orderCalculator, 
-                List.of(mealProcessor, customProcessor),
-                inventoryClient,
+                orderRepository,
+                messagePublisher,
+                orderMapper,
+                orderCalculator,
                 menuClient
         );
     }
@@ -70,133 +53,191 @@ class OrderServiceImplTest {
     // ── Helpers ──────────────────────────────────────────────────
 
     private OrderResponse buildDummyResponse() {
-        return new OrderResponse(
-                1L, 100L, OrderStatus.PENDING, BigDecimal.valueOf(15.99),
-                450.0, 35.0, 40.0, 12.0, null,
-                Collections.emptyList(), Collections.emptyList());
+        return new OrderResponse(1L, 100L, OrderStatus.PENDING,
+                BigDecimal.valueOf(15.99), 0, null, Collections.emptyList());
+    }
+
+    private MealPriceSnapshot buildSnapshot(Long mealId) {
+        return new MealPriceSnapshot(mealId, "Test Meal", BigDecimal.valueOf(9.99));
     }
 
     // ── Tests ────────────────────────────────────────────────────
 
     @Test
-    void placeOrder_withStandardMeals_snapshotsAndSaves() {
-        UUID mealId = UUID.randomUUID();
+    void placeOrder_withValidPoints_fetchesPriceAndSavesOrder() {
+        Long mealId = 1L;
         OrderItemRequest itemReq = new OrderItemRequest(mealId, 2);
-        PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), null);
+        PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), 100);
 
-        // Mock processor support and behavior
-        when(mealProcessor.supports(itemReq)).thenReturn(true);
-        
+        when(menuClient.getMealById(mealId)).thenReturn(buildSnapshot(mealId));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(1L);
+            o.setCustomerId(100L);
             return o;
         });
         when(orderMapper.toResponse(any(Order.class))).thenReturn(buildDummyResponse());
 
-        orderService.placeOrder(request, 100L);
+        OrderResponse response = orderService.placeOrder(request, 100L);
 
-        verify(mealProcessor).process(any(Order.class), eq(itemReq));
+        assertNotNull(response);
+        verify(menuClient).getMealById(mealId);
         verify(orderCalculator).calculateTotals(any(Order.class));
-        verify(orderRepository).save(any(Order.class));
+        verify(menuClient).reserveStock(List.of(itemReq));
+        verify(orderRepository, atLeastOnce()).save(any(Order.class));
+        verify(messagePublisher).publishPointRedemptionRequested(any(), anyString(), anyString());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void placeOrder_exceedingMaxQuantity_throwsException() {
-        UUID mealId = UUID.randomUUID();
-        OrderItemRequest itemReq = new OrderItemRequest(mealId, 15); // Exceeds default max 10
-        PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), null);
+    void placeOrder_withInvalidPoints_throwsPointsException() {
+        PlaceOrderRequest request = new PlaceOrderRequest(Collections.emptyList(), 50);
 
-        when(mealProcessor.supports(itemReq)).thenReturn(true);
-        doThrow(new RuntimeException("Quantity exceeds maximum")).when(mealProcessor).process(any(), any());
-
-        assertThrows(RuntimeException.class, () -> orderService.placeOrder(request, 100L));
+        assertThrows(PointsException.class, () -> orderService.placeOrder(request, 100L));
+        verifyNoInteractions(menuClient, orderRepository, messagePublisher);
     }
 
     @Test
-    void placeOrder_withCustomIngredients_snapshotsAndSaves() {
-        UUID ingredientId = UUID.randomUUID();
-        CustomOrderItemRequest customReq = new CustomOrderItemRequest(ingredientId);
-        PlaceOrderRequest request = new PlaceOrderRequest(null, List.of(customReq));
+    void placeOrder_withNoPoints_publishesPaymentRequestedEvent() {
+        Long mealId = 1L;
+        PlaceOrderRequest request = new PlaceOrderRequest(List.of(new OrderItemRequest(mealId, 1)), 0);
 
-        when(customProcessor.supports(customReq)).thenReturn(true);
-        
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
-            Order o = inv.getArgument(0);
-            o.setId(2L);
-            return o;
-        });
-        when(orderMapper.toResponse(any(Order.class))).thenReturn(buildDummyResponse());
-
-        orderService.placeOrder(request, 100L);
-
-        verify(customProcessor).process(any(Order.class), eq(customReq));
-        verify(orderCalculator).calculateTotals(any(Order.class));
-    }
-
-    @Test
-    void placeOrder_withMixedItems_coordinatesProcessorsAndCalculator() {
-        OrderItemRequest mealReq = new OrderItemRequest(UUID.randomUUID(), 2);
-        CustomOrderItemRequest customReq = new CustomOrderItemRequest(UUID.randomUUID());
-        PlaceOrderRequest request = new PlaceOrderRequest(List.of(mealReq), List.of(customReq));
-
-        when(mealProcessor.supports(mealReq)).thenReturn(true);
-        when(customProcessor.supports(customReq)).thenReturn(true);
-
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
-            Order o = inv.getArgument(0);
-            o.setId(3L);
-            return o;
-        });
-        when(orderMapper.toResponse(any(Order.class))).thenReturn(buildDummyResponse());
-
-        orderService.placeOrder(request, 100L);
-
-        verify(mealProcessor).process(any(Order.class), eq(mealReq));
-        verify(customProcessor).process(any(Order.class), eq(customReq));
-        verify(orderCalculator).calculateTotals(any(Order.class));
-    }
-
-    @Test
-    void placeOrder_publishesOrderCreatedEvent() {
-        PlaceOrderRequest request = new PlaceOrderRequest(null, null);
-
+        when(menuClient.getMealById(mealId)).thenReturn(buildSnapshot(mealId));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(5L);
+            o.setTotalPrice(BigDecimal.valueOf(9.99));
             return o;
         });
         when(orderMapper.toResponse(any(Order.class))).thenReturn(buildDummyResponse());
 
         orderService.placeOrder(request, 100L);
 
-        ArgumentCaptor<OrderCreatedEvent> eventCaptor = ArgumentCaptor.forClass(OrderCreatedEvent.class);
-        verify(messagePublisher).publishOrderCreated(eventCaptor.capture(), anyString(), anyString());
-
-        assertEquals(5L, eventCaptor.getValue().getId());
+        verify(messagePublisher).publishPaymentRequested(any(), anyString(), anyString());
+        verify(messagePublisher, never()).publishPointRedemptionRequested(any(), anyString(), anyString());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void confirmOrder_updatesStatus() {
-        Order order = Order.builder().id(10L).status(OrderStatus.PENDING).build();
-        when(orderRepository.findById(10L)).thenReturn(java.util.Optional.of(order));
+    void placeOrder_dbFailure_rollsBackStock() {
+        Long mealId = 1L;
+        PlaceOrderRequest request = new PlaceOrderRequest(List.of(new OrderItemRequest(mealId, 1)), 0);
+
+        when(menuClient.getMealById(mealId)).thenReturn(buildSnapshot(mealId));
+        when(orderRepository.save(any(Order.class))).thenThrow(new RuntimeException("DB Down"));
+
+        assertThrows(RuntimeException.class, () -> orderService.placeOrder(request, 100L));
+
+        verify(menuClient).reserveStock(any());
+        verify(menuClient).rollbackStock(any());
+    }
+
+    @Test
+    void confirmOrder_updatesStatusToConfirmed() {
+        Order order = Order.builder().id(10L).totalPrice(BigDecimal.valueOf(25)).status(OrderStatus.PAID).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
 
         orderService.confirmOrder(10L, 200L);
 
         assertEquals(OrderStatus.CONFIRMED, order.getStatus());
-        verify(orderRepository).findById(10L);
+        verify(orderRepository).save(order);
     }
 
     @Test
-    void cancelOrder_updatesStatus() {
-        Order order = Order.builder().id(10L).status(OrderStatus.PENDING).build();
-        when(orderRepository.findById(10L)).thenReturn(java.util.Optional.of(order));
+    void confirmOrder_alreadyConfirmed_skips() {
+        Order order = Order.builder().id(10L).status(OrderStatus.CONFIRMED).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
 
-        orderService.cancelOrder(10L, "Stock issues");
+        orderService.confirmOrder(10L, 200L);
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void markPaymentSucceeded_updatesStatusAndNotifiesKitchen() {
+        Order order = Order.builder().id(10L).status(OrderStatus.AWAITING_PAYMENT).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.markPaymentSucceeded(10L);
+
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        verify(orderRepository).save(order);
+        verify(messagePublisher).publishOrderCreated(any(), anyString(), anyString());
+    }
+
+    @Test
+    void markPaymentSucceeded_alreadyPaid_skips() {
+        Order order = Order.builder().id(10L).status(OrderStatus.PAID).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.markPaymentSucceeded(10L);
+
+        verify(orderRepository, never()).save(any());
+        verify(messagePublisher, never()).publishOrderCreated(any(), anyString(), anyString());
+    }
+
+    @Test
+    void markPointRedemptionSucceeded_updatesStatusToAwaitingPayment() {
+        Order order = Order.builder().id(10L).status(OrderStatus.PENDING).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.markPointRedemptionSucceeded(10L);
+
+        assertEquals(OrderStatus.AWAITING_PAYMENT, order.getStatus());
+        verify(orderRepository).save(order);
+        verify(messagePublisher).publishPaymentRequested(any(), anyString(), anyString());
+    }
+
+    @Test
+    void markPointRedemptionSucceeded_alreadyProcessed_skips() {
+        Order order = Order.builder().id(10L).status(OrderStatus.AWAITING_PAYMENT).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.markPointRedemptionSucceeded(10L);
+
+        verify(orderRepository, never()).save(any());
+        verify(messagePublisher, never()).publishPaymentRequested(any(), anyString(), anyString());
+    }
+
+    @Test
+    void onTicketReady_updatesStatusToReadyForPickup() {
+        Order order = Order.builder().id(10L).status(OrderStatus.CONFIRMED).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.onTicketReady(10L);
+
+        assertEquals(OrderStatus.READY_FOR_PICKUP, order.getStatus());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void onTicketReady_alreadyReady_skips() {
+        Order order = Order.builder().id(10L).status(OrderStatus.READY_FOR_PICKUP).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.onTicketReady(10L);
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelOrder_rollsBackStockAndUpdatesStatus() {
+        Order order = Order.builder().id(10L).status(OrderStatus.PAID).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(10L, "Manual cancel");
 
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
-        verify(orderRepository).findById(10L);
+        verify(menuClient).rollbackStock(any());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void cancelOrder_alreadyCancelled_skips() {
+        Order order = Order.builder().id(10L).status(OrderStatus.CANCELLED).build();
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(10L, "Double cancel");
+
+        verify(menuClient, never()).rollbackStock(any());
+        verify(orderRepository, never()).save(any());
     }
 }

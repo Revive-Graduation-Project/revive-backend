@@ -1,8 +1,12 @@
 package com.restaurant.order.client;
 
-import com.restaurant.order.dto.snapshot.MealSnapshot;
-import java.util.UUID;
+import com.restaurant.order.dto.request.OrderItemRequest;
+import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
+
+import java.util.List;
 
 public interface MenuClient {
-    MealSnapshot getMealById(UUID mealId);
+    MealPriceSnapshot getMealById(Long mealId);
+    void reserveStock(List<OrderItemRequest> items);
+    void rollbackStock(List<OrderItemRequest> items);
 }
