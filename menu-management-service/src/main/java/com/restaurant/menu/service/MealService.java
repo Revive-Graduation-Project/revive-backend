@@ -31,5 +31,14 @@ public interface MealService {
      * @return list of matching MealDTOs
      */
     List<MealDTO> getMealsByIds(List<Long> ids);
+    /**
+     * Creates a new meal from a manual request.
+     */
+    MealDTO createMeal(com.restaurant.menu.dto.MealRequest request);
+
+    /**
+     * Updates an existing meal from a manual request.
+     */
+    MealDTO updateMeal(Long id, com.restaurant.menu.dto.MealRequest request);
 }
 
