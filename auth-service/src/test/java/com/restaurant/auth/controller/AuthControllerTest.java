@@ -1,9 +1,9 @@
 package com.restaurant.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.exception.GlobalExceptionHandler;
 import com.restaurant.auth.exception.EmailAlreadyExistsException;
@@ -50,10 +50,11 @@ class AuthControllerTest {
         // ── POST /auth/signup ─────────────────────────────────────────────────────
 
         @Test
-        @DisplayName("POST /auth/signup returns 201 and a token for a valid request")
+        @DisplayName("POST /auth/signup returns 201 and a message for a valid request")
         void signup_validRequest_returns201() throws Exception {
-                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", Role.CLIENT);
-                AuthResponse response = new AuthResponse("jwt-token-abc");
+                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", null, null, null, null,
+                                null, null, null, null, null, null);
+                MessageResponse response = new MessageResponse("User registered successfully. Profile creation is pending.");
 
                 given(authService.signup(request)).willReturn(response);
 
@@ -61,14 +62,15 @@ class AuthControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.token").value("jwt-token-abc"));
+                                .andExpect(jsonPath("$.message").value("User registered successfully. Profile creation is pending."));
         }
 
         @Test
         @DisplayName("POST /auth/signup returns 400 when username is blank")
         void signup_blankUsername_returns400() throws Exception {
-                SignupRequest request = new SignupRequest("", "secret123", Role.CLIENT); // blank email triggers
-                                                                                         // @NotBlank
+                SignupRequest request = new SignupRequest("", "secret123", null, null, null, null, null, null, null,
+                                null, null, null); // blank email triggers
+                // @NotBlank
 
                 mockMvc.perform(post("/auth/signup")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -80,7 +82,8 @@ class AuthControllerTest {
         @Test
         @DisplayName("POST /auth/signup returns 400 when password is too short")
         void signup_shortPassword_returns400() throws Exception {
-                SignupRequest request = new SignupRequest("johndoe@example.com", "abc", Role.CLIENT);
+                SignupRequest request = new SignupRequest("johndoe@example.com", "abc", null, null, null, null, null,
+                                null, null, null, null, null);
 
                 mockMvc.perform(post("/auth/signup")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -111,7 +114,8 @@ class AuthControllerTest {
         @Test
         @DisplayName("POST /auth/signup returns 409 when username is already taken")
         void signup_duplicateUsername_returns409() throws Exception {
-                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", Role.CLIENT);
+                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", null, null, null, null,
+                                null, null, null, null, null, null);
 
                 given(authService.signup(request))
                                 .willThrow(new EmailAlreadyExistsException("johndoe@example.com"));

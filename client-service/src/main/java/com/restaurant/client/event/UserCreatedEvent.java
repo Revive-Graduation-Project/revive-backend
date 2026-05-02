@@ -1,4 +1,4 @@
-package com.restaurant.auth.event;
+package com.restaurant.client.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

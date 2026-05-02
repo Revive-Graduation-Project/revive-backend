@@ -154,6 +154,18 @@ public class MealServiceImpl implements MealService {
         return processMealIngredients(meal, request.ingredients());
     }
 
+    @Override
+    @Transactional
+    public void deleteMeal(Long id) {
+        log.info("Deleting meal: {}", id);
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new MealNotFoundException(id));
+        
+        // MealIngredient records will be deleted automatically due to cascade/orphan removal
+        // but the actual Ingredient entities remain untouched.
+        mealRepository.delete(meal);
+    }
+
     private MealDTO processMealIngredients(Meal meal, List<MealRequest.IngredientQuantity> ingredientRequests) {
         List<Long> ingredientIds = ingredientRequests.stream()
                 .map(MealRequest.IngredientQuantity::ingredientId)
