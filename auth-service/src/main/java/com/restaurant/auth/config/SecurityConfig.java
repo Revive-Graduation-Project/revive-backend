@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
+                                "/auth/v3/api-docs",
+                                "/auth/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/index.html")
@@ -83,6 +85,8 @@ public class SecurityConfig {
         return (web) -> web.ignoring().requestMatchers(
                 "/v3/api-docs/**",
                 "/v3/api-docs",
+                "/auth/v3/api-docs",
+                "/auth/v3/api-docs/**",
                 "/swagger-ui/**",
                 "/swagger-ui.html",
                 "/swagger-ui/index.html");

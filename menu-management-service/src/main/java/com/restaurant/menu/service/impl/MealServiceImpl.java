@@ -9,7 +9,9 @@ import com.restaurant.menu.entity.Meal;
 import com.restaurant.menu.entity.MealIngredient;
 import com.restaurant.menu.event.MenuNutritionEvent;
 import com.restaurant.menu.exception.MealNotFoundException;
+import com.restaurant.menu.dto.MealRequest;
 import com.restaurant.menu.mapper.MealMapper;
+import com.restaurant.menu.repository.IngredientRepository;
 import com.restaurant.menu.repository.MealRepository;
 import com.restaurant.menu.service.IngredientService;
 import com.restaurant.menu.service.MealService;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -29,6 +32,7 @@ public class MealServiceImpl implements MealService {
 
     private final MealRepository mealRepository;
     private final IngredientService ingredientService;
+    private final IngredientRepository ingredientRepository;
     private final MealMapper mealMapper;
 
     @Override
@@ -119,5 +123,103 @@ public class MealServiceImpl implements MealService {
     public List<MealDTO> getMealsByIds(List<Long> ids) {
         log.info("Fetching meals by ids: {}", ids);
         return mealMapper.toDTOList(mealRepository.findAllById(ids));
+    }
+
+    @Override
+    @Transactional
+    public MealDTO createMeal(MealRequest request) {
+        log.info("Creating meal: {}", request.name());
+
+        Meal meal = Meal.builder()
+                .name(request.name())
+                .price(request.price())
+                .category(request.category())
+                .isActive(true)
+                .build();
+
+        return processMealIngredients(meal, request.ingredients());
+    }
+
+    @Override
+    @Transactional
+    public MealDTO updateMeal(Long id, MealRequest request) {
+        log.info("Updating meal: {}", id);
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new MealNotFoundException(id));
+
+        meal.setName(request.name());
+        meal.setPrice(request.price());
+        meal.setCategory(request.category());
+
+        return processMealIngredients(meal, request.ingredients());
+    }
+
+    private MealDTO processMealIngredients(Meal meal, List<MealRequest.IngredientQuantity> ingredientRequests) {
+        List<Long> ingredientIds = ingredientRequests.stream()
+                .map(MealRequest.IngredientQuantity::ingredientId)
+                .toList();
+
+        List<Ingredient> ingredients = ingredientRepository.findAllById(ingredientIds);
+        if (ingredients.size() != ingredientIds.size()) {
+            throw new IllegalArgumentException("One or more ingredients not found");
+        }
+
+        Map<Long, Ingredient> ingredientMap = ingredients.stream()
+                .collect(Collectors.toMap(Ingredient::getId, i -> i));
+
+        List<MealIngredient> mealIngredients = new ArrayList<>();
+        Map<String, NutrientInfo> aggregatedNutrients = new LinkedHashMap<>();
+
+        for (MealRequest.IngredientQuantity req : ingredientRequests) {
+            Ingredient ingredient = ingredientMap.get(req.ingredientId());
+            mealIngredients.add(MealIngredient.builder()
+                    .meal(meal)
+                    .ingredient(ingredient)
+                    .quantityGrams(req.quantity())
+                    .build());
+
+            if (ingredient.getNutrients() != null) {
+                // We assume stored nutrients are absolute/per some unit.
+                // We scale based on (quantity / 100.0) as standard USDA format is per 100g.
+                double scalingFactor = req.quantity() / 100.0;
+
+                for (Map<String, Object> nut : ingredient.getNutrients()) {
+                    String nutrientName = (String) nut.get("nutrientName");
+                    String unitName = (String) nut.get("unitName");
+                    double value = nut.get("value") instanceof Number
+                            ? ((Number) nut.get("value")).doubleValue()
+                            : 0.0;
+
+                    double scaledValue = Math.round(value * scalingFactor * 100.0) / 100.0;
+
+                    aggregatedNutrients.merge(
+                            nutrientName + "_" + unitName,
+                            new NutrientInfo(nutrientName, scaledValue, unitName),
+                            (existing, incoming) -> new NutrientInfo(
+                                    existing.nutrientName(),
+                                    Math.round((existing.value() + incoming.value()) * 100.0) / 100.0,
+                                    existing.unitName()));
+                }
+            }
+        }
+
+        List<Map<String, Object>> finalMealNutrients = aggregatedNutrients.values().stream()
+                .map(n -> Map.<String, Object>of(
+                        "nutrientName", n.nutrientName(),
+                        "value", n.value(),
+                        "unitName", n.unitName()))
+                .toList();
+
+        meal.setNutrients(finalMealNutrients);
+
+        if (meal.getMealIngredients() != null) {
+            meal.getMealIngredients().clear();
+            meal.getMealIngredients().addAll(mealIngredients);
+        } else {
+            meal.setMealIngredients(mealIngredients);
+        }
+
+        Meal saved = mealRepository.save(meal);
+        return mealMapper.toDTO(saved);
     }
 }

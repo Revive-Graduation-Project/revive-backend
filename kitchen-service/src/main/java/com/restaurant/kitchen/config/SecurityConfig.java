@@ -40,6 +40,13 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/kitchen/v3/api-docs",
+                                "/api/kitchen/v3/api-docs/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .requestMatchers("/api/kitchen/tickets/**").hasRole("CHEF")
                         .requestMatchers("/api/kitchen/chefs/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
