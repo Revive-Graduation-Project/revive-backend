@@ -40,6 +40,10 @@ spring:
 server:
   port: 8086
 
+springdoc:
+  api-docs:
+    path: /api/kitchen/v3/api-docs
+
 # ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
@@ -129,3 +133,9 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

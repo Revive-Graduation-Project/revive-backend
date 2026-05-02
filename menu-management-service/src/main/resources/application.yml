@@ -22,6 +22,10 @@ spring:
 server:
   port: 8084
 
+springdoc:
+  api-docs:
+    path: /api/menu/v3/api-docs
+
 # ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
@@ -106,3 +110,9 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

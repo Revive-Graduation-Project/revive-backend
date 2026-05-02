@@ -33,7 +33,11 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/auth/login",
             "/auth/signup",
-            "/actuator/health");
+            "/actuator/health",
+            "/v3/api-docs",
+            "/swagger-ui",
+            "/swagger-ui.html",
+            "/webjars/");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -43,6 +47,7 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
 
         // 1. Check if route is public
         boolean isPublic = PUBLIC_PATHS.stream().anyMatch(path::startsWith) ||
+                path.contains("/v3/api-docs") ||
                 (method.equals("GET") && (path.startsWith("/api/menu") || path.startsWith("/api/ingredients")));
 
         String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
