@@ -27,6 +27,12 @@ public class ClientProfileServiceImpl implements ClientProfileService {
     @Override
     @Transactional
     public void createProfileFromEvent(UserCreatedEvent event) {
+        // Idempotency check: Ensure we don't create duplicate profiles for the same User ID
+        if (clientProfileRepository.existsById(event.getId())) {
+            log.info("ClientProfile for user ID: {} already exists. Ignoring duplicate event.", event.getId());
+            return;
+        }
+
         // Map the simple string fields back to our Enums safely
         Gender gender = null;
         if (event.getGender() != null && !event.getGender().isBlank()) {
