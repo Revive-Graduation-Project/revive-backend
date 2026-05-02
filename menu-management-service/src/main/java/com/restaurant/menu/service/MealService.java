@@ -40,5 +40,10 @@ public interface MealService {
      * Updates an existing meal from a manual request.
      */
     MealDTO updateMeal(Long id, com.restaurant.menu.dto.MealRequest request);
+
+    /**
+     * Deletes an existing meal.
+     */
+    void deleteMeal(Long id);
 }
 

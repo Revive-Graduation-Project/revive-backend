@@ -26,6 +26,19 @@ springdoc:
   api-docs:
     path: /api/clients/v3/api-docs
 
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      client-user-created:
+        name: client.user.created.queue
+        routing-key: user.created
+        dlq-name: client.user.created.queue.dlq
+        dlq-routing-key: user.created.dlq
+      auth-compensation:
+        routing-key: client.profile.failed
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run
 # ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +54,12 @@ spring:
     password: postgres
     driver-class-name: org.postgresql.Driver
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEV profile — Docker Compose run
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,6 +74,12 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
 
 server:
   port: 8080
@@ -73,6 +98,9 @@ spring:
     username: neondb_owner
     password: npg_tHN2wIgpPo6E
     driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: amqps://jpndmhye:pPZzD9atkwLkSBQwt6bCBV-ATQrBzxCf@seal.lmq.cloudamqp.com/jpndmhye
 
   jpa:
     hibernate:

@@ -56,6 +56,17 @@ public class MenuController {
         return ResponseEntity.ok(updated);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteMeal(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role)) {
+            return forbidden(role);
+        }
+        mealService.deleteMeal(id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────
 
     private boolean isAuthorized(String role) {

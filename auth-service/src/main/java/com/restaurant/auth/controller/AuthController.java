@@ -2,12 +2,15 @@ package com.restaurant.auth.controller;
 
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
+import com.restaurant.auth.dto.StaffSignupRequest;
 import com.restaurant.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,8 +25,18 @@ public class AuthController {
      * Never exposes the User entity; delegates entirely to AuthService.
      */
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<MessageResponse> signup(@Valid @RequestBody SignupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.signup(request));
+    }
+
+    /**
+     * Registers a new staff member.
+     * Only accessible to ADMIN and MANAGER roles.
+     */
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER')")
+    @PostMapping("/staff/signup")
+    public ResponseEntity<MessageResponse> signupStaff(@Valid @RequestBody StaffSignupRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.signupStaff(request));
     }
 
     /**

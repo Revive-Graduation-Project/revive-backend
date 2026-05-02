@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record SignupRequest(
+public record StaffSignupRequest(
 
         @NotBlank(message = "Email must not be blank")
         @Email(message = "Invalid email format")
@@ -16,16 +16,7 @@ public record SignupRequest(
         @Size(min = 6, message = "Password must be at least 6 characters")
         String password,
 
-        // Client Profile fields
-        String phoneNumber,
-        Integer age,
-        String gender,
-        Boolean exercisesRegularly,
-        Double height,
-        String heightUnit,
-        Double weight,
-        String weightUnit,
-        String goal,
-        java.util.List<String> healthConditions
+        @NotNull(message = "Role must not be null")
+        Role role
 
 ) {}

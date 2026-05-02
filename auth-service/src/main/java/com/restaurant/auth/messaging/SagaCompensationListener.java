@@ -28,7 +28,7 @@ public class SagaCompensationListener {
      * </p>
      */
     @Transactional
-    @RabbitListener(queues = RabbitMQConfig.COMPENSATION_QUEUE)
+    @RabbitListener(queues = {RabbitMQConfig.COMPENSATION_QUEUE, RabbitMQConfig.CLIENT_COMPENSATION_QUEUE})
     public void handleProfileCreationFailed(ProfileCreationFailedEvent event) {
         log.warn("Saga compensation triggered for userId={}", event.getId());
 
