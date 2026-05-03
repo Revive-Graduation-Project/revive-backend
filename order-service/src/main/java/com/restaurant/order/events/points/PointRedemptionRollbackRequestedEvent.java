@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PointRedemptionFailedEvent {
+public class PointRedemptionRollbackRequestedEvent {
     private Long orderId;
     private Long clientId;
-    private String reason;
+    private Integer pointsToRollback;
 }

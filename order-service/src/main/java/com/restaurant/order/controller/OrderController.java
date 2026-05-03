@@ -24,9 +24,9 @@ public class OrderController {
             @AuthenticationPrincipal Jwt jwt) {
 
         Number id = jwt.getClaim("id");
-        Long customerId = id.longValue();
+        Long clientId = id.longValue();
 
-        OrderResponse response = orderService.placeOrder(request, customerId);
+        OrderResponse response = orderService.placeOrder(request, clientId);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

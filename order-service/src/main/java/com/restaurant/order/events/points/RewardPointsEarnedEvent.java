@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RewardPointsEarnedEvent {
-    private Long id; // orderId
-    private Long customerId;
-    private Integer points;
+    private Long clientId;
+    private Integer pointsEarned;
+    private Long orderId;
 }

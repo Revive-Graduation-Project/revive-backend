@@ -40,25 +40,25 @@ public class MessageListener {
 
     @RabbitListener(queues = "${app.rabbitmq.queues.payment-succeeded.name}")
     public void onPaymentSucceeded(PaymentSucceededEvent event) {
-        log.info("Received payment.succeeded event for orderId: {}", event.getId());
-        orderService.markPaymentSucceeded(event.getId());
+        log.info("Received payment.succeeded event for orderId: {}", event.getOrderId());
+        orderService.markPaymentSucceeded(event.getOrderId());
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queues.payment-failed.name}")
     public void onPaymentFailed(PaymentFailedEvent event) {
-        log.info("Received payment.failed event for orderId: {}, reason: {}", event.getId(), event.getReason());
-        orderService.markPaymentFailed(event.getId(), event.getReason());
+        log.info("Received payment.failed event for orderId: {}, reason: {}", event.getOrderId(), event.getReason());
+        orderService.markPaymentFailed(event.getOrderId(), event.getReason());
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queues.point-redemption-succeeded.name}")
     public void onPointRedemptionSucceeded(PointRedemptionSucceededEvent event) {
-        log.info("Received point-redemption.succeeded event for orderId: {}", event.getId());
-        orderService.markPointRedemptionSucceeded(event.getId());
+        log.info("Received point-redemption.succeeded event for orderId: {}", event.getOrderId());
+        orderService.markPointRedemptionSucceeded(event.getOrderId());
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queues.point-redemption-failed.name}")
     public void onPointRedemptionFailed(PointRedemptionFailedEvent event) {
-        log.info("Received point-redemption.failed event for orderId: {}, reason: {}", event.getId(), event.getReason());
-        orderService.markPointRedemptionFailed(event.getId(), event.getReason());
+        log.info("Received point-redemption.failed event for orderId: {}, reason: {}", event.getOrderId(), event.getReason());
+        orderService.markPointRedemptionFailed(event.getOrderId(), event.getReason());
     }
 }

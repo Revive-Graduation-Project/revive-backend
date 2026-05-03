@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaymentRequestedEvent {
-    private Long id; // orderId
-    private Long customerId;
+    private Long orderId;
+    private Long clientId;
     private BigDecimal amount;
 }

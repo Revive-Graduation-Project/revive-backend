@@ -1,14 +1,16 @@
-package com.restaurant.order.events.points;
+package com.restaurant.order.events.payments;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PointRedemptionFailedEvent {
+public class PaymentRefundRequestedEvent {
     private Long orderId;
     private Long clientId;
-    private String reason;
+    private BigDecimal amount;
 }

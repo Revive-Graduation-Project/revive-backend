@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaymentFailedEvent {
-    private Long id; // orderId
+    private Long orderId;
     private String reason;
 }

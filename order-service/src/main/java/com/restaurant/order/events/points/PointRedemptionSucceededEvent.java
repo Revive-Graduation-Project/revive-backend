@@ -8,5 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PointRedemptionSucceededEvent {
-    private Long id; // orderId
+    private Long clientId;
+    private Long orderId;
 }

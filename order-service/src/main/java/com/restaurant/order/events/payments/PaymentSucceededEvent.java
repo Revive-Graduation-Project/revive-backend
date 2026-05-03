@@ -8,5 +8,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaymentSucceededEvent {
-    private Long id; // orderId
+    private Long orderId;
 }

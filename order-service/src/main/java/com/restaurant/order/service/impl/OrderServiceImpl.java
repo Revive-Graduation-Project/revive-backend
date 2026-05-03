@@ -9,7 +9,9 @@ import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.enums.OrderStatus;
 import com.restaurant.order.events.OrderCreatedEvent;
+import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.payments.PaymentRequestedEvent;
+import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
 import com.restaurant.order.events.points.RewardPointsEarnedEvent;
 import com.restaurant.order.exception.MenuServiceException;
@@ -43,8 +45,8 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public OrderResponse placeOrder(PlaceOrderRequest request, Long customerId) {
-        log.info("Placing order for customerId: {}", customerId);
+    public OrderResponse placeOrder(PlaceOrderRequest request, Long clientId) {
+        log.info("Placing order for customerId: {}", clientId);
 
         // 1. Validate points
         int pointsToRedeem = request.points() != null ? request.points() : 0;
@@ -59,7 +61,7 @@ public class OrderServiceImpl implements OrderService {
         };
 
         Order order = Order.builder()
-                .customerId(customerId)
+                .clientId(clientId)
                 .discount(discount)
                 .build();
 
@@ -104,11 +106,11 @@ public class OrderServiceImpl implements OrderService {
 
             return orderMapper.toResponse(savedOrder);
         } catch (Exception e) {
-            log.error("Failed to complete order placement for customerId: {}. Rolling back stock.", customerId, e);
+            log.error("Failed to complete order placement for clientId: {}. Rolling back stock.", clientId, e);
             try {
                 menuClient.rollbackStock(buildItemRequests(order));
             } catch (Exception rollbackEx) {
-                log.error("CRITICAL: Failed to rollback stock after order placement failure for customerId: {}", customerId, rollbackEx);
+                log.error("CRITICAL: Failed to rollback stock after order placement failure for clientId: {}", clientId, rollbackEx);
             }
             throw e; // Re-throw the original exception (PointsException, PaymentException, or DB exception)
         }
@@ -133,7 +135,7 @@ public class OrderServiceImpl implements OrderService {
                             int pointsToReward = order.getTotalPrice().intValue() / 5;
                             if (pointsToReward > 0) {
                                 messagePublisher.publishRewardPointsEarned(
-                                        new RewardPointsEarnedEvent(order.getId(), order.getCustomerId(), pointsToReward)
+                                        new RewardPointsEarnedEvent(order.getClientId(), pointsToReward, order.getId())
                                 );
                             }
                         }
@@ -236,6 +238,7 @@ public class OrderServiceImpl implements OrderService {
                             return;
                         }
 
+                        // 1. Rollback Stock (Always if not already cancelled and stock was reserved)
                         if (order.getStatus() != OrderStatus.READY_FOR_PICKUP) {
                             try {
                                 log.info("Rolling back stock for cancelled order {}", orderId);
@@ -244,6 +247,19 @@ public class OrderServiceImpl implements OrderService {
                                 log.error("Failed to rollback stock for cancelled order {}", orderId, e);
                             }
                         }
+
+                        // 2. Refund Payment if order was PAID or beyond
+                        if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
+                            log.info("Triggering payment refund for order {}", orderId);
+                            publishPaymentRefundEvent(order);
+                        }
+
+                        // 3. Rollback Points if they were successfully redeemed
+                        if (order.getDiscount() != 0 && order.getStatus() != OrderStatus.PENDING) {
+                            log.info("Triggering point redemption rollback for order {}", orderId);
+                            publishPointRedemptionRollbackEvent(order);
+                        }
+
                         order.setStatus(OrderStatus.CANCELLED);
                         orderRepository.save(order);
                         log.info("Order {} cancelled. Reason: {}", orderId, reason);
@@ -303,7 +319,7 @@ public class OrderServiceImpl implements OrderService {
             String sagaId = UUID.randomUUID().toString();
             String correlationId = UUID.randomUUID().toString();
             messagePublisher.publishPaymentRequested(
-                    new PaymentRequestedEvent(order.getId(), order.getCustomerId(), order.getTotalPrice()), sagaId, correlationId);
+                    new PaymentRequestedEvent(order.getId(), order.getClientId(), order.getTotalPrice()), sagaId, correlationId);
         } catch (Exception e) {
             log.error("Failed to publish payment.requested event for orderId: {}", order.getId(), e);
             throw new PaymentException("Order placement failed due to payment request failure");
@@ -315,10 +331,32 @@ public class OrderServiceImpl implements OrderService {
             String sagaId = UUID.randomUUID().toString();
             String correlationId = UUID.randomUUID().toString();
             messagePublisher.publishPointRedemptionRequested(
-                    new PointRedemptionRequestedEvent(order.getId(), order.getCustomerId(), order.getDiscount() * 10), sagaId, correlationId);
+                    new PointRedemptionRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10), sagaId, correlationId);
         } catch (Exception e) {
             log.error("Failed to publish point-redemption.requested event for orderId: {}", order.getId(), e);
             throw new PointsException("Order placement failed due to point redemption request failure");
+        }
+    }
+
+    private void publishPointRedemptionRollbackEvent(Order order) {
+        try {
+            String sagaId = UUID.randomUUID().toString();
+            String correlationId = UUID.randomUUID().toString();
+            messagePublisher.publishPointRedemptionRollback(
+                    new PointRedemptionRollbackRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10), sagaId, correlationId);
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to publish point-redemption.rollback event for orderId: {}", order.getId(), e);
+        }
+    }
+
+    private void publishPaymentRefundEvent(Order order) {
+        try {
+            String sagaId = UUID.randomUUID().toString();
+            String correlationId = UUID.randomUUID().toString();
+            messagePublisher.publishPaymentRefund(
+                    new PaymentRefundRequestedEvent(order.getId(), order.getClientId(), order.getTotalPrice()), sagaId, correlationId);
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to publish payment.refund event for orderId: {}", order.getId(), e);
         }
     }
 }

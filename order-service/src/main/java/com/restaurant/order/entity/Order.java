@@ -28,8 +28,8 @@ public class Order {
     )
     private Long id;
 
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @Column(name = "client_id", nullable = false)
+    private Long clientId;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)

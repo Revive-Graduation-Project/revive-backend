@@ -73,7 +73,7 @@ class OrderServiceImplTest {
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(1L);
-            o.setCustomerId(100L);
+            o.setClientId(100L);
             return o;
         });
         when(orderMapper.toResponse(any(Order.class))).thenReturn(buildDummyResponse());

@@ -20,7 +20,7 @@ public interface OrderMapper {
 
         return new OrderResponse(
                 order.getId(),
-                order.getCustomerId(),
+                order.getClientId(),
                 order.getStatus(),
                 order.getTotalPrice(),
                 order.getDiscount(),

@@ -1,7 +1,9 @@
 package com.restaurant.order.messaging;
 
 import com.restaurant.order.events.OrderCreatedEvent;
+import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.payments.PaymentRequestedEvent;
+import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
 import com.restaurant.order.events.points.RewardPointsEarnedEvent;
 import jakarta.annotation.Nullable;
@@ -30,18 +32,28 @@ public class MessagePublisher {
 
     public void publishPaymentRequested(PaymentRequestedEvent event, String sagaId, String correlationId) {
         send("payment.requested", event, sagaId, correlationId);
-        log.info("Payment requested event published for orderId: {}", event.getId());
+        log.info("Payment requested event published for orderId: {}", event.getOrderId());
     }
 
     public void publishPointRedemptionRequested(PointRedemptionRequestedEvent event, String sagaId, String correlationId) {
         send("points.redemption.requested", event, sagaId, correlationId);
-        log.info("Point redemption requested event published for orderId: {}", event.getId());
+        log.info("Point redemption requested event published for orderId: {}", event.getOrderId());
     }
 
     public void publishRewardPointsEarned(RewardPointsEarnedEvent event) {
         // Simple fire and forget for rewarding
         send("points.earned", event, null, UUID.randomUUID().toString());
-        log.info("Reward points earned event published for orderId: {}, points: {}", event.getId(), event.getPoints());
+        log.info("Reward points earned event published for orderId: {}, points: {}", event.getOrderId(), event.getPointsEarned());
+    }
+
+    public void publishPointRedemptionRollback(PointRedemptionRollbackRequestedEvent event, String sagaId, String correlationId) {
+        send("points.redemption.rollback", event, sagaId, correlationId);
+        log.info("Point redemption rollback event published for orderId: {}", event.getOrderId());
+    }
+
+    public void publishPaymentRefund(PaymentRefundRequestedEvent event, String sagaId, String correlationId) {
+        send("payment.refund.requested", event, sagaId, correlationId);
+        log.info("Payment refund requested event published for orderId: {}", event.getOrderId());
     }
 
     private void send(String routingKey, Object payload, @Nullable String sagaId, String correlationId) {
