@@ -129,6 +129,37 @@ class ClientProfileServiceTests {
         verify(clientProfileRepository, never()).save(any());
     }
 
+    @Test
+    void rollbackRedemption_Success() {
+        // Arrange
+        when(pointOperationRepository.existsByOrderIdAndOperationType(orderId, PointOperationType.ROLLBACK))
+                .thenReturn(false);
+        when(clientProfileRepository.findById(clientId)).thenReturn(Optional.of(profile));
+
+        // Act
+        clientProfileService.rollbackRedemption(clientId, 40, orderId);
+
+        // Assert
+        assertEquals(140, profile.getLoyaltyPoints());
+        verify(clientProfileRepository, times(1)).save(profile);
+        verify(pointOperationRepository, times(1)).save(any(PointOperation.class));
+    }
+
+    @Test
+    void rollbackRedemption_Idempotency() {
+        // Arrange
+        when(pointOperationRepository.existsByOrderIdAndOperationType(orderId, PointOperationType.ROLLBACK))
+                .thenReturn(true);
+
+        // Act
+        clientProfileService.rollbackRedemption(clientId, 40, orderId);
+
+        // Assert
+        assertEquals(100, profile.getLoyaltyPoints());
+        verify(clientProfileRepository, never()).save(any());
+        verify(pointOperationRepository, never()).save(any());
+    }
+
     // --- Profile Management Tests ---
 
     @Test

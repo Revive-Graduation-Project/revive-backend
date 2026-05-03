@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.restaurant.client.event.PointRedemptionRollbackRequestedEvent;
 import com.restaurant.client.event.PointRedemptionRequestedEvent;
 import com.restaurant.client.event.PointsEarnedEvent;
 import com.restaurant.client.event.UserCreatedEvent;
@@ -58,6 +59,19 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.queues.points-earned.dlq-routing-key}")
     private String pointsEarnedDLQRoutingKey;
 
+    // points-redemption-rollback
+    @Value("${app.rabbitmq.queues.points-redemption-rollback.name}")
+    private String pointsRedemptionRollbackQueue;
+
+    @Value("${app.rabbitmq.queues.points-redemption-rollback.routing-key}")
+    private String pointsRedemptionRollbackRoutingKey;
+
+    @Value("${app.rabbitmq.queues.points-redemption-rollback.dlq-name}")
+    private String pointsRedemptionRollbackDLQName;
+
+    @Value("${app.rabbitmq.queues.points-redemption-rollback.dlq-routing-key}")
+    private String pointsRedemptionRollbackDLQRoutingKey;
+
     // --------- Converter ----------
     @Bean
     public MessageConverter converter() {
@@ -69,6 +83,7 @@ public class RabbitMQConfig {
         idClassMapping.put("com.restaurant.auth.event.UserCreatedEvent", UserCreatedEvent.class);
         idClassMapping.put("com.restaurant.order.events.points.PointRedemptionRequestedEvent", PointRedemptionRequestedEvent.class);
         idClassMapping.put("com.restaurant.order.events.points.PointsEarnedEvent", PointsEarnedEvent.class);
+        idClassMapping.put("com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent", PointRedemptionRollbackRequestedEvent.class);
         typeMapper.setIdClassMapping(idClassMapping);
 
         converter.setJavaTypeMapper(typeMapper);
@@ -132,6 +147,20 @@ public class RabbitMQConfig {
         return new Queue(pointsEarnedDLQName, true);
     }
 
+    @Bean
+    public Queue pointsRedemptionRollbackQueue() {
+        return QueueBuilder.durable(pointsRedemptionRollbackQueue)
+                .withArgument("x-dead-letter-exchange", exchange)
+                .withArgument("x-dead-letter-routing-key", pointsRedemptionRollbackDLQRoutingKey)
+                .withArgument("x-message-ttl", 30000)
+                .build();
+    }
+
+    @Bean
+    public Queue pointsRedemptionRollbackDLQ() {
+        return new Queue(pointsRedemptionRollbackDLQName, true);
+    }
+
     // --------- Bindings ----------
     @Bean
     public Binding bindingClientUserCreatedQueue() {
@@ -179,5 +208,21 @@ public class RabbitMQConfig {
                 .bind(pointsEarnedDLQ())
                 .to(restaurantExchange())
                 .with(pointsEarnedDLQRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingPointsRedemptionRollbackQueue() {
+        return BindingBuilder
+                .bind(pointsRedemptionRollbackQueue())
+                .to(restaurantExchange())
+                .with(pointsRedemptionRollbackRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingPointsRedemptionRollbackDLQ() {
+        return BindingBuilder
+                .bind(pointsRedemptionRollbackDLQ())
+                .to(restaurantExchange())
+                .with(pointsRedemptionRollbackDLQRoutingKey);
     }
 }

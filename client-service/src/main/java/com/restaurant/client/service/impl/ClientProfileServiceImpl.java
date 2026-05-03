@@ -177,6 +177,32 @@ public class ClientProfileServiceImpl implements ClientProfileService {
         log.info("Added {} points for client {}. New total: {}", points, clientId, profile.getLoyaltyPoints());
     }
 
+    @Override
+    @Transactional
+    public void rollbackRedemption(Long clientId, Integer points, Long orderId) {
+        // Idempotency check
+        if (pointOperationRepository.existsByOrderIdAndOperationType(orderId, PointOperationType.ROLLBACK)) {
+            log.info("Point rollback already processed for order ID: {}. Skipping.", orderId);
+            return;
+        }
+
+        ClientProfile profile = clientProfileRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client profile not found"));
+
+        profile.setLoyaltyPoints(profile.getLoyaltyPoints() + points);
+        clientProfileRepository.save(profile);
+
+        // Record operation for idempotency
+        pointOperationRepository.save(PointOperation.builder()
+                .client(profile)
+                .orderId(orderId)
+                .operationType(PointOperationType.ROLLBACK)
+                .amount(points)
+                .build());
+
+        log.info("Rolled back {} points for client {}. New total: {}", points, clientId, profile.getLoyaltyPoints());
+    }
+
     private ClientProfileDto mapToDto(ClientProfile profile) {
         return ClientProfileDto.builder()
                 .id(profile.getId())

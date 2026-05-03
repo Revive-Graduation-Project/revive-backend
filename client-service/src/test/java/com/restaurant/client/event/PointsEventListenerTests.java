@@ -79,4 +79,20 @@ class PointsEventListenerTests {
         // Assert
         verify(clientProfileService).addPoints(clientId, 20, orderId);
     }
+
+    @Test
+    void handlePointRedemptionRollback_Success() {
+        // Arrange
+        PointRedemptionRollbackRequestedEvent event = PointRedemptionRollbackRequestedEvent.builder()
+                .clientId(clientId)
+                .pointsToRollback(50)
+                .orderId(orderId)
+                .build();
+
+        // Act
+        pointsEventListener.handlePointRedemptionRollback(event);
+
+        // Assert
+        verify(clientProfileService).rollbackRedemption(clientId, 50, orderId);
+    }
 }

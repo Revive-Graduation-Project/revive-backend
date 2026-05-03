@@ -48,6 +48,11 @@ app:
         routing-key: points.earned
         dlq-name: points.earned.queue.dlq
         dlq-routing-key: points.earned.dlq
+      points-redemption-rollback:
+        name: points.redemption.rollback.queue
+        routing-key: points.redemption.rollback
+        dlq-name: points.redemption.rollback.queue.dlq
+        dlq-routing-key: points.redemption.rollback.dlq
       points-redemption-succeeded:
         routing-key: points.redemption.succeeded
       points-redemption-failed:
