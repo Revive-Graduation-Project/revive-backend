@@ -7,12 +7,10 @@ import com.restaurant.inventory.dto.IngredientEntry;
 import com.restaurant.inventory.dto.IngredientNutrition;
 import com.restaurant.inventory.dto.MealNutrition;
 import com.restaurant.inventory.dto.NormalizedIngredient;
-import com.restaurant.inventory.dto.NutrientInfo;
 import com.restaurant.inventory.dto.UsdaFoodDetail;
 import com.restaurant.inventory.event.MenuNutritionEvent;
 import com.restaurant.inventory.helper.CsvParserHelper;
 import com.restaurant.inventory.hooks.OpenRouter;
-import com.restaurant.inventory.hooks.Genai;
 import com.restaurant.inventory.hooks.UsdaService;
 import com.restaurant.inventory.messaging.MenuNutritionPublisher;
 import lombok.RequiredArgsConstructor;
@@ -65,8 +63,8 @@ public class MenuCsvService {
                     .distinct()
                     .toList();
 
-            final Map<String, NormalizedIngredient> normalizedCache = allUniqueIngredients.isEmpty() 
-                    ? Map.of() 
+            final Map<String, NormalizedIngredient> normalizedCache = allUniqueIngredients.isEmpty()
+                    ? Map.of()
                     : batchNormalizeIngredients(allUniqueIngredients);
 
             if (!normalizedCache.isEmpty()) {

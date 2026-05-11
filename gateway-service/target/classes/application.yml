@@ -12,6 +12,19 @@ spring:
 
   cloud:
     gateway:
+      # ── Global CORS — lets browsers talk to the gateway ────────────
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            exposed-headers: "*"
+            allow-credentials: false
+            max-age: 3600
+
       routes:
         # ── Auth Service (login, signup) ───────────────────────────────
         - id: auth-service

@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +26,8 @@ public class ClientProfileServiceImpl implements ClientProfileService {
     @Override
     @Transactional
     public void createProfileFromEvent(UserCreatedEvent event) {
-        // Idempotency check: Ensure we don't create duplicate profiles for the same User ID
+        // Idempotency check: Ensure we don't create duplicate profiles for the same
+        // User ID
         if (clientProfileRepository.existsById(event.getId())) {
             log.info("ClientProfile for user ID: {} already exists. Ignoring duplicate event.", event.getId());
             return;
@@ -95,19 +95,28 @@ public class ClientProfileServiceImpl implements ClientProfileService {
         ClientProfile profile = clientProfileRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client profile not found"));
 
-        if (request.getAge() != null) profile.setAge(request.getAge());
-        if (request.getGender() != null) profile.setGender(request.getGender());
-        if (request.getExercisesRegularly() != null) profile.setExercisesRegularly(request.getExercisesRegularly());
-        if (request.getHeight() != null) profile.setHeight(request.getHeight());
-        if (request.getHeightUnit() != null) profile.setHeightUnit(request.getHeightUnit());
-        if (request.getWeight() != null) profile.setWeight(request.getWeight());
-        if (request.getWeightUnit() != null) profile.setWeightUnit(request.getWeightUnit());
-        if (request.getGoal() != null) profile.setGoal(request.getGoal());
+        if (request.getAge() != null)
+            profile.setAge(request.getAge());
+        if (request.getGender() != null)
+            profile.setGender(request.getGender());
+        if (request.getExercisesRegularly() != null)
+            profile.setExercisesRegularly(request.getExercisesRegularly());
+        if (request.getHeight() != null)
+            profile.setHeight(request.getHeight());
+        if (request.getHeightUnit() != null)
+            profile.setHeightUnit(request.getHeightUnit());
+        if (request.getWeight() != null)
+            profile.setWeight(request.getWeight());
+        if (request.getWeightUnit() != null)
+            profile.setWeightUnit(request.getWeightUnit());
+        if (request.getGoal() != null)
+            profile.setGoal(request.getGoal());
         if (request.getHealthConditions() != null) {
             profile.getHealthConditions().clear();
             profile.getHealthConditions().addAll(request.getHealthConditions());
         }
-        if (request.getPhoneNumber() != null) profile.setPhoneNumber(request.getPhoneNumber());
+        if (request.getPhoneNumber() != null)
+            profile.setPhoneNumber(request.getPhoneNumber());
 
         profile = clientProfileRepository.save(profile);
         return mapToDto(profile);
