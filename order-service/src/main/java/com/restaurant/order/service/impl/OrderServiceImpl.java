@@ -1,6 +1,7 @@
 package com.restaurant.order.service.impl;
 
 import com.restaurant.order.client.MenuClient;
+import com.restaurant.order.client.PaymentServiceClient;
 import com.restaurant.order.dto.request.OrderItemRequest;
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
@@ -10,13 +11,11 @@ import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.enums.OrderStatus;
 import com.restaurant.order.events.OrderCreatedEvent;
 import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
-import com.restaurant.order.events.payments.PaymentRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
 import com.restaurant.order.events.points.RewardPointsEarnedEvent;
 import com.restaurant.order.exception.MenuServiceException;
 import com.restaurant.order.exception.OrderNotFoundException;
-import com.restaurant.order.exception.PaymentException;
 import com.restaurant.order.exception.PointsException;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.messaging.MessagePublisher;
@@ -42,6 +41,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderCalculator orderCalculator;
     private final MenuClient menuClient;
+    private final PaymentServiceClient paymentServiceClient;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -101,7 +101,7 @@ public class OrderServiceImpl implements OrderService {
             } else {
                 savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
                 orderRepository.save(savedOrder);
-                publishPaymentRequestedEvent(savedOrder);
+                createPaymentIntentSync(savedOrder);
             }
 
             return orderMapper.toResponse(savedOrder);
@@ -130,7 +130,7 @@ public class OrderServiceImpl implements OrderService {
                         orderRepository.save(order);
                         log.info("Order {} status updated to CONFIRMED (ticket {})", orderId, ticketId);
 
-                        // Reward points: 1 point per 5$ spent
+                        // Reward points: 1 point per 5 EGP spent
                         if(order.getDiscount() == 0) {
                             int pointsToReward = order.getTotalPrice().intValue() / 5;
                             if (pointsToReward > 0) {
@@ -184,6 +184,8 @@ public class OrderServiceImpl implements OrderService {
         cancelOrder(orderId, "Payment failed: " + reason);
     }
 
+
+
     @Transactional
     @Override
     public void markPointRedemptionSucceeded(Long orderId) {
@@ -203,7 +205,7 @@ public class OrderServiceImpl implements OrderService {
                         order.setStatus(OrderStatus.AWAITING_PAYMENT);
                         orderRepository.save(order);
                         log.info("Point redemption succeeded for order {}. Proceeding to payment...", orderId);
-                        publishPaymentRequestedEvent(order);
+                        createPaymentIntentSync(order);
                     } catch (Exception e) {
                         log.error("MANUAL INTERVENTION REQUIRED: Failed to process point redemption success for order {}. Error: {}", orderId, e.getMessage());
                         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
@@ -314,16 +316,15 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private void publishPaymentRequestedEvent(Order order) {
-        try {
-            String sagaId = UUID.randomUUID().toString();
-            String correlationId = UUID.randomUUID().toString();
-            messagePublisher.publishPaymentRequested(
-                    new PaymentRequestedEvent(order.getId(), order.getClientId(), order.getTotalPrice()), sagaId, correlationId);
-        } catch (Exception e) {
-            log.error("Failed to publish payment.requested event for orderId: {}", order.getId(), e);
-            throw new PaymentException("Order placement failed due to payment request failure");
-        }
+    private void createPaymentIntentSync(Order order) {
+        PaymentServiceClient.PaymentIntentResponse response = paymentServiceClient.createPaymentIntent(
+
+                order.getId(), order.getClientId(), order.getTotalPrice(), "egp");
+
+        order.setStripePaymentIntentId(response.paymentIntentId());
+        order.setStripeClientSecret(response.clientSecret());
+        orderRepository.save(order);
+        log.info("PaymentIntent created and stored for order {}: intentId={}", order.getId(), response.paymentIntentId());
     }
 
     private void publishPointRedemptionRequestedEvent(Order order) {

@@ -13,5 +13,6 @@ public record OrderResponse(
         BigDecimal totalPrice,
         Integer discount,
         LocalDateTime createdAt,
+        String stripeClientSecret,
         List<OrderItemResponse> items
 ) {}

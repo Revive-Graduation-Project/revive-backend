@@ -1,6 +1,7 @@
 package com.restaurant.order.service;
 
 import com.restaurant.order.client.MenuClient;
+import com.restaurant.order.client.PaymentServiceClient;
 import com.restaurant.order.dto.request.OrderItemRequest;
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
@@ -36,6 +37,7 @@ class OrderServiceImplTest {
     @Mock private OrderMapper orderMapper;
     @Mock private OrderCalculator orderCalculator;
     @Mock private MenuClient menuClient;
+    @Mock private PaymentServiceClient paymentServiceClient;
 
     private OrderServiceImpl orderService;
 
@@ -46,7 +48,8 @@ class OrderServiceImplTest {
                 messagePublisher,
                 orderMapper,
                 orderCalculator,
-                menuClient
+                menuClient,
+                paymentServiceClient
         );
     }
 
@@ -54,7 +57,7 @@ class OrderServiceImplTest {
 
     private OrderResponse buildDummyResponse() {
         return new OrderResponse(1L, 100L, OrderStatus.PENDING,
-                BigDecimal.valueOf(15.99), 0, null, Collections.emptyList());
+                BigDecimal.valueOf(15.99), 0, null, null, Collections.emptyList());
     }
 
     private MealPriceSnapshot buildSnapshot(Long mealId) {
@@ -97,7 +100,7 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void placeOrder_withNoPoints_publishesPaymentRequestedEvent() {
+    void placeOrder_withNoPoints_createsPaymentIntentSync() {
         Long mealId = 1L;
         PlaceOrderRequest request = new PlaceOrderRequest(List.of(new OrderItemRequest(mealId, 1)), 0);
 
@@ -109,10 +112,12 @@ class OrderServiceImplTest {
             return o;
         });
         when(orderMapper.toResponse(any(Order.class))).thenReturn(buildDummyResponse());
+        when(paymentServiceClient.createPaymentIntent(anyLong(), anyLong(), any(), anyString()))
+                .thenReturn(new PaymentServiceClient.PaymentIntentResponse("secret_123", "pi_123", "requires_payment_method"));
 
         orderService.placeOrder(request, 100L);
 
-        verify(messagePublisher).publishPaymentRequested(any(), anyString(), anyString());
+        verify(paymentServiceClient).createPaymentIntent(anyLong(), anyLong(), any(), anyString());
         verify(messagePublisher, never()).publishPointRedemptionRequested(any(), anyString(), anyString());
     }
 
@@ -176,14 +181,17 @@ class OrderServiceImplTest {
 
     @Test
     void markPointRedemptionSucceeded_updatesStatusToAwaitingPayment() {
-        Order order = Order.builder().id(10L).status(OrderStatus.PENDING).build();
+        Order order = Order.builder().id(10L).clientId(100L).totalPrice(BigDecimal.valueOf(25)).status(OrderStatus.PENDING).build();
         when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentServiceClient.createPaymentIntent(anyLong(), anyLong(), any(), anyString()))
+                .thenReturn(new PaymentServiceClient.PaymentIntentResponse("secret_123", "pi_123", "requires_payment_method"));
 
         orderService.markPointRedemptionSucceeded(10L);
 
         assertEquals(OrderStatus.AWAITING_PAYMENT, order.getStatus());
-        verify(orderRepository).save(order);
-        verify(messagePublisher).publishPaymentRequested(any(), anyString(), anyString());
+        verify(orderRepository, atLeastOnce()).save(order);
+        verify(paymentServiceClient).createPaymentIntent(anyLong(), anyLong(), any(), anyString());
     }
 
     @Test
@@ -194,7 +202,7 @@ class OrderServiceImplTest {
         orderService.markPointRedemptionSucceeded(10L);
 
         verify(orderRepository, never()).save(any());
-        verify(messagePublisher, never()).publishPaymentRequested(any(), anyString(), anyString());
+        verify(paymentServiceClient, never()).createPaymentIntent(anyLong(), anyLong(), any(), anyString());
     }
 
     @Test

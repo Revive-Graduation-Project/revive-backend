@@ -2,7 +2,6 @@ package com.restaurant.order.messaging;
 
 import com.restaurant.order.events.OrderCreatedEvent;
 import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
-import com.restaurant.order.events.payments.PaymentRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
 import com.restaurant.order.events.points.RewardPointsEarnedEvent;
@@ -30,11 +29,6 @@ public class MessagePublisher {
         log.info("Order created event published for orderId: {}", event.getId());
     }
 
-    public void publishPaymentRequested(PaymentRequestedEvent event, String sagaId, String correlationId) {
-        send("payment.requested", event, sagaId, correlationId);
-        log.info("Payment requested event published for orderId: {}", event.getOrderId());
-    }
-
     public void publishPointRedemptionRequested(PointRedemptionRequestedEvent event, String sagaId, String correlationId) {
         send("points.redemption.requested", event, sagaId, correlationId);
         log.info("Point redemption requested event published for orderId: {}", event.getOrderId());
@@ -52,7 +46,7 @@ public class MessagePublisher {
     }
 
     public void publishPaymentRefund(PaymentRefundRequestedEvent event, String sagaId, String correlationId) {
-        send("payment.refund.requested", event, sagaId, correlationId);
+        send("payment.refund", event, sagaId, correlationId);
         log.info("Payment refund requested event published for orderId: {}", event.getOrderId());
     }
 
