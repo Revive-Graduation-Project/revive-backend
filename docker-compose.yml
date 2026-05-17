@@ -126,6 +126,26 @@ services:
       timeout: 5s
       retries: 5
 
+  payment-db:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: payment-db
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    networks:
+      - restaurant-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ─────────────────────────────────────────────
   # Message Broker
   # ─────────────────────────────────────────────
@@ -147,37 +167,23 @@ services:
       retries: 5
 
   # ─────────────────────────────────────────────
-  # API Gateway (ONLY exposed port to the outside)
-  # ─────────────────────────────────────────────
-  gateway-service:
-    build:
-      context: ./gateway-service
-    container_name: gateway-service
-    ports:
-      - "8080:8080"          # the ONLY port exposed to the host
-    environment:
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    depends_on:
-      - auth-service
-      - client-service
-      - inventory-service
-      - menu-management-service
-      - order-service
-      - kitchen-service
-    networks:
-      - restaurant-net
-
-  # ─────────────────────────────────────────────
-  # Spring Boot Microservices (internal only)
-  # All services use SPRING_PROFILES_ACTIVE=dev (set in Dockerfile)
-  # which configures container hostnames for DB and RabbitMQ.
+  # Spring Boot Microservices
   # ─────────────────────────────────────────────
   auth-service:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
     container_name: auth-service
-    # no ports: — only reachable via gateway on Docker network
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://auth-db:5432/auth_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
       auth-db:
         condition: service_healthy
@@ -191,7 +197,12 @@ services:
       context: .
       dockerfile: client-service/Dockerfile
     container_name: client-service
-    # no ports: — only reachable via gateway on Docker network
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://client-db:5432/client_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       client-db:
         condition: service_healthy
@@ -203,13 +214,14 @@ services:
       context: .
       dockerfile: inventory-service/Dockerfile
     container_name: inventory-service
-    # no ports: — only reachable via gateway on Docker network
-    env_file:
-      - inventory-service/.env
+    ports:
+      - "8083:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-db:5432/inventory_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       inventory-db:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
     networks:
       - restaurant-net
@@ -219,11 +231,14 @@ services:
       context: .
       dockerfile: menu-management-service/Dockerfile
     container_name: menu-management-service
-    # no ports: — only reachable via gateway on Docker network
+    ports:
+      - "8084:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://menu-db:5432/menu_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       menu-db:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
     networks:
       - restaurant-net
@@ -233,7 +248,12 @@ services:
       context: .
       dockerfile: order-service/Dockerfile
     container_name: order-service
-    # no ports: — only reachable via gateway on Docker network
+    ports:
+      - "8085:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://order-db:5432/order_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       order-db:
         condition: service_healthy
@@ -245,13 +265,42 @@ services:
       context: .
       dockerfile: kitchen-service/Dockerfile
     container_name: kitchen-service
-    # no ports: — only reachable via gateway on Docker network
+    ports:
+      - "8086:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://kitchen-db:5432/kitchen_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       kitchen-db:
         condition: service_healthy
     networks:
       - restaurant-net
 
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    ports:
+      - "8088:8088"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://payment-db:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - restaurant-net
 
   # ─────────────────────────────────────────────
   # Next.js Frontend / AI Proxy  (disabled — uncomment when ready)
@@ -278,4 +327,5 @@ volumes:
   menu-db-data:
   order-db-data:
   kitchen-db-data:
+  payment-db-data:
   rabbitmq_data:
