@@ -10,4 +10,8 @@ public interface ClientProfileService {
     ClientProfileDto getProfile(Long clientId);
     ClientProfileDto updateProfile(Long clientId, UpdateClientProfileRequest request);
     void deleteProfile(Long clientId);
+
+    void redeemPoints(Long clientId, Integer points, Long orderId);
+    void addPoints(Long clientId, Integer points, Long orderId);
+    void rollbackRedemption(Long clientId, Integer points, Long orderId);
 }

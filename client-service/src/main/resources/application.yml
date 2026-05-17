@@ -38,6 +38,25 @@ app:
         dlq-routing-key: user.created.dlq
       auth-compensation:
         routing-key: client.profile.failed
+      points-redemption-requested:
+        name: points.redemption.requested.queue
+        routing-key: points.redemption.requested
+        dlq-name: points.redemption.requested.queue.dlq
+        dlq-routing-key: points.redemption.requested.dlq
+      points-earned:
+        name: points.earned.queue
+        routing-key: points.earned
+        dlq-name: points.earned.queue.dlq
+        dlq-routing-key: points.earned.dlq
+      points-redemption-rollback:
+        name: points.redemption.rollback.queue
+        routing-key: points.redemption.rollback
+        dlq-name: points.redemption.rollback.queue.dlq
+        dlq-routing-key: points.redemption.rollback.dlq
+      points-redemption-succeeded:
+        routing-key: points.redemption.succeeded
+      points-redemption-failed:
+        routing-key: points.redemption.failed
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run

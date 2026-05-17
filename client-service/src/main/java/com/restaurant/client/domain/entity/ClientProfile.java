@@ -45,6 +45,7 @@ public class ClientProfile {
     @Enumerated(EnumType.STRING)
     private Goal goal;
 
+    @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "client_health_conditions",
@@ -57,6 +58,7 @@ public class ClientProfile {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    @Builder.Default
     @Column(name = "loyalty_points")
     private Integer loyaltyPoints = 0;
 
