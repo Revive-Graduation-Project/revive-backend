@@ -1,6 +1,5 @@
 package com.restaurant.payment.messaging;
 
-import com.restaurant.payment.dto.PaymentIntentCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

@@ -1,9 +1,5 @@
 package com.restaurant.payment.controller;
 
-import com.restaurant.payment.dto.PaymentFailedEvent;
-import com.restaurant.payment.dto.PaymentSucceededEvent;
-import com.restaurant.payment.messaging.MessagePublisher;
-import com.restaurant.payment.repository.PaymentRepository;
 import com.restaurant.payment.service.PaymentService;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
@@ -43,12 +39,18 @@ public class StripeWebhookController {
 
         log.info("Received Stripe event: {}", event.getType());
 
-        if ("payment_intent.succeeded".equals(event.getType())) {
-            PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().get();
+        var deserializer = event.getDataObjectDeserializer();
+        if (!deserializer.getObject().isPresent()) {
+            log.warn("Could not deserialize Stripe event data object for event type: {}", event.getType());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid event payload");
+        }
+
+        var stripeObject = deserializer.getObject().get();
+
+        if ("payment_intent.succeeded".equals(event.getType()) && stripeObject instanceof PaymentIntent intent) {
             log.info("Payment Succeeded for intent: {}", intent.getId());
             paymentService.handlePaymentIntentSucceeded(intent.getId(), intent.getAmount());
-        } else if ("payment_intent.payment_failed".equals(event.getType())) {
-            PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().get();
+        } else if ("payment_intent.payment_failed".equals(event.getType()) && stripeObject instanceof PaymentIntent intent) {
             log.info("Payment Failed for intent: {}", intent.getId());
             String error = intent.getLastPaymentError() != null ? intent.getLastPaymentError().getMessage() : "Unknown error";
             paymentService.handlePaymentIntentFailed(intent.getId(), error);

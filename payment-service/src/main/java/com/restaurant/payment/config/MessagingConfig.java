@@ -14,10 +14,10 @@ public class MessagingConfig {
     @Value("${app.rabbitmq.exchange}")
     private String exchange;
 
-    @Value("${app.rabbitmq.queues.payment-refund-requested.name}")
+    @Value("${app.rabbitmq.queues.payment-refund.name}")
     private String paymentRefundQueue;
 
-    @Value("${app.rabbitmq.queues.payment-refund-requested.routing-key}")
+    @Value("${app.rabbitmq.queues.payment-refund.routing-key}")
     private String paymentRefundRoutingKey;
 
     @Bean

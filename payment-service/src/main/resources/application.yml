@@ -12,6 +12,7 @@ spring:
       ddl-auto: update
     show-sql: true
 
+
   rabbitmq:
     host: ${RABBIT_HOST:localhost}
     port: ${RABBIT_PORT:5672}

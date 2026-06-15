@@ -1,6 +1,5 @@
 package com.restaurant.payment.messaging;
 
-import com.restaurant.payment.dto.PaymentRequest;
 import com.restaurant.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
