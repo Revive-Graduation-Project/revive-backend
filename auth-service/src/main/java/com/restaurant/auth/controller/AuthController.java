@@ -31,7 +31,8 @@ public class AuthController {
 
     /**
      * Registers a new staff member.
-     * Only accessible to ADMIN and MANAGER roles.
+     * ADMIN can create CHEF and MANAGER roles.
+     * MANAGER can only create CHEF role.
      */
     @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER')")
     @PostMapping("/staff/signup")

@@ -79,12 +79,30 @@ public class AuthService {
 
     @Transactional
     public MessageResponse signupStaff(StaffSignupRequest request) {
-        // 1. Guard: reject duplicate emails
+        // 1. Guard: never allow creating ADMIN or CLIENT via this endpoint
+        if (request.role() == Role.ADMIN || request.role() == Role.CLIENT) {
+            throw new IllegalArgumentException(
+                    "Staff signup only allows CHEF or MANAGER roles");
+        }
+
+        // 2. Guard: enforce caller-specific permissions
+        //    ADMIN  → can create CHEF, MANAGER
+        //    MANAGER → can only create CHEF
+        String callerRole = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getAuthorities()
+                .iterator().next().getAuthority();
+
+        if ("MANAGER".equals(callerRole) && request.role() != Role.CHEF) {
+            throw new IllegalArgumentException(
+                    "Managers can only create CHEF accounts");
+        }
+
+        // 3. Guard: reject duplicate emails
         if (userRepository.existsByEmail(request.email())) {
             throw new EmailAlreadyExistsException(request.email());
         }
 
-        // 2. Persist the new staff user with a hashed password
+        // 4. Persist the new staff user with a hashed password
         User user = User.builder()
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
@@ -93,9 +111,9 @@ public class AuthService {
                 .build();
 
         user = userRepository.save(user);
-        log.info("Staff user created: id={}, role={}", user.getId(), user.getRole());
+        log.info("Staff user created: id={}, role={} (by {})", user.getId(), user.getRole(), callerRole);
 
-        // 3. Publish UserCreatedEvent to the shared exchange
+        // 5. Publish UserCreatedEvent to the shared exchange
         UserCreatedEvent event = UserCreatedEvent.builder()
                 .id(user.getId())
                 .role(user.getRole().name())
@@ -106,7 +124,7 @@ public class AuthService {
                 event);
         log.info("Published UserCreatedEvent for staff userId={}", user.getId());
 
-        // 4. Return a success message
+        // 6. Return a success message
         return new MessageResponse("Staff user registered successfully.");
     }
 

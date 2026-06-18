@@ -53,6 +53,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    // ── 400 Bad Request (illegal argument) ────────────────────────────────────
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
