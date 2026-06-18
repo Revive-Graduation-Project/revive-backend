@@ -1,0 +1,49 @@
+# ------------------------------------------------------------------------------
+# Git Ignore - Revive Backend Workspace
+# ------------------------------------------------------------------------------
+
+# Secrets & Environment Variables (CRITICAL)
+.env
+.env.local
+.env.*.local
+
+# Compiled class file
+*.class
+
+# Log files
+/*.log
+*.log.*
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Maven build directory
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.backup
+pom.xml.lt
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDEs and Editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.metadata
+.DS_Store
+.DS_Store
