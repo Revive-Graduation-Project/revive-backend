@@ -110,6 +110,7 @@ public class MenuCsvService {
                         mealName,
                         mealCsvEntry.category(),
                         mealCsvEntry.price(),
+                        mealCsvEntry.description(),
                         ingredientNutritions);
                 result.add(mealNutrition);
 

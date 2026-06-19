@@ -85,6 +85,7 @@ public class CsvParserHelper {
             String unit = row.get("unit");
             String category = row.getOrDefault("category", "Uncategorized");
             String priceRaw = row.getOrDefault("price", "0");
+            String description = row.getOrDefault("description", "");
 
             if (mealName == null || mealName.isBlank()) {
                 log.warn("Skipping row with missing meal_name");
@@ -116,7 +117,7 @@ public class CsvParserHelper {
 
             double finalPrice = price;
             MealCsvEntry mealEntry = menuMap.computeIfAbsent(mealName, k ->
-                    new MealCsvEntry(new ArrayList<>(), category.trim(), finalPrice));
+                    new MealCsvEntry(new ArrayList<>(), category.trim(), finalPrice, description.trim()));
             mealEntry.ingredients().add(entry);
         }
 
@@ -127,7 +128,7 @@ public class CsvParserHelper {
     /**
      * Holds the parsed CSV data for a single meal.
      */
-    public record MealCsvEntry(List<IngredientEntry> ingredients, String category, double price) {
+    public record MealCsvEntry(List<IngredientEntry> ingredients, String category, double price, String description) {
     }
 
     public void validateFile(MultipartFile file) {

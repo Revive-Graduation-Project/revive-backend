@@ -47,11 +47,13 @@ public class MealServiceImpl implements MealService {
             Meal meal = mealRepository.findByName(mealNutrition.mealName())
                     .orElseGet(() -> Meal.builder()
                             .name(mealNutrition.mealName())
+                            .description(mealNutrition.description())
                             .isActive(true)
                             .build());
 
             meal.setCategory(mealNutrition.category());
             meal.setPrice(mealNutrition.price());
+            meal.setDescription(mealNutrition.description());
 
             List<MealIngredient> mealIngredients = new ArrayList<>();
 
