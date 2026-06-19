@@ -132,6 +132,7 @@ public class MealServiceImpl implements MealService {
 
         Meal meal = Meal.builder()
                 .name(request.name())
+                .description(request.description())
                 .price(request.price())
                 .category(request.category())
                 .isActive(true)
@@ -148,6 +149,7 @@ public class MealServiceImpl implements MealService {
                 .orElseThrow(() -> new MealNotFoundException(id));
 
         meal.setName(request.name());
+        meal.setDescription(request.description());
         meal.setPrice(request.price());
         meal.setCategory(request.category());
 

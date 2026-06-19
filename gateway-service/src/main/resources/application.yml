@@ -15,14 +15,14 @@ spring:
       # ── Global CORS — lets browsers talk to the gateway ────────────
       globalcors:
         cors-configurations:
-          '[/**]':
+          "[/**]":
             allowed-origins:
               - "http://localhost:5173"
               - "http://localhost:3000"
             allowed-methods: "*"
             allowed-headers: "*"
             exposed-headers: "*"
-            allow-credentials: false
+            allow-credentials: true
             max-age: 3600
 
       routes:
@@ -99,6 +99,7 @@ management:
 server:
   port: 8080
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run (uses env-var defaults above)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +150,7 @@ spring:
           uri: http://client-service:8080
           predicates:
             - Path=/api/clients/**
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PROD profile — Railway deployment

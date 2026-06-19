@@ -25,6 +25,9 @@ public class Meal {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(name = "description")
+    private String description;
+
     /**
      * Stores the full list of nutrients as a JSON column.
      * Each entry has: nutrientName, value, unitName.

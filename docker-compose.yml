@@ -133,7 +133,7 @@ services:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # AMQP
+      - "5672:5672" # AMQP
       - "15672:15672" # Management UI
     environment:
       RABBITMQ_DEFAULT_USER: guest
@@ -154,7 +154,7 @@ services:
       context: ./gateway-service
     container_name: gateway-service
     ports:
-      - "8080:8080"          # the ONLY port exposed to the host
+      - "8080:8080" # the ONLY port exposed to the host
     environment:
       JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     depends_on:
@@ -178,6 +178,15 @@ services:
       dockerfile: auth-service/Dockerfile
     container_name: auth-service
     # no ports: — only reachable via gateway on Docker network
+    environment:
+      AUTH_DB_URL: jdbc:postgresql://auth-db:5432/auth_db
+      AUTH_DB_USERNAME: postgres
+      AUTH_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     depends_on:
       auth-db:
         condition: service_healthy
@@ -192,6 +201,14 @@ services:
       dockerfile: client-service/Dockerfile
     container_name: client-service
     # no ports: — only reachable via gateway on Docker network
+    environment:
+      CLIENT_DB_URL: jdbc:postgresql://client-db:5432/client_db
+      CLIENT_DB_USERNAME: postgres
+      CLIENT_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
     depends_on:
       client-db:
         condition: service_healthy
@@ -206,6 +223,18 @@ services:
     # no ports: — only reachable via gateway on Docker network
     env_file:
       - inventory-service/.env
+    environment:
+      INVENTORY_DB_URL: jdbc:postgresql://inventory-db:5432/inventory_db
+      INVENTORY_DB_USERNAME: postgres
+      INVENTORY_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      USDA_API_KEY: ${USDA_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -220,6 +249,14 @@ services:
       dockerfile: menu-management-service/Dockerfile
     container_name: menu-management-service
     # no ports: — only reachable via gateway on Docker network
+    environment:
+      MENU_DB_URL: jdbc:postgresql://menu-db:5432/menu_db
+      MENU_DB_USERNAME: postgres
+      MENU_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
     depends_on:
       menu-db:
         condition: service_healthy
@@ -234,6 +271,10 @@ services:
       dockerfile: order-service/Dockerfile
     container_name: order-service
     # no ports: — only reachable via gateway on Docker network
+    environment:
+      ORDER_DB_URL: jdbc:postgresql://order-db:5432/order_db
+      ORDER_DB_USERNAME: postgres
+      ORDER_DB_PASSWORD: postgres
     depends_on:
       order-db:
         condition: service_healthy
@@ -246,12 +287,20 @@ services:
       dockerfile: kitchen-service/Dockerfile
     container_name: kitchen-service
     # no ports: — only reachable via gateway on Docker network
+    environment:
+      KITCHEN_DB_URL: jdbc:postgresql://kitchen-db:5432/kitchen_db
+      KITCHEN_DB_USERNAME: postgres
+      KITCHEN_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     depends_on:
       kitchen-db:
         condition: service_healthy
     networks:
       - restaurant-net
-
 
   # ─────────────────────────────────────────────
   # Next.js Frontend / AI Proxy  (disabled — uncomment when ready)
