@@ -49,7 +49,6 @@ springdoc:
   api-docs:
     path: /api/orders/v3/api-docs
 
-<<<<<<< HEAD
 # ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
@@ -80,8 +79,6 @@ app:
   services:
     menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
     payment-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
-=======
->>>>>>> acc46a7a8fd76bf9aa15992d1d6a33a5384e3a63
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run
