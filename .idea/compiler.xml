@@ -38,6 +38,12 @@
         <module name="menu-management-service" />
         <module name="client-service" />
       </profile>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="gateway-service" />
+      </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
