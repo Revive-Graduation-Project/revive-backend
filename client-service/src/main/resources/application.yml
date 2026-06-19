@@ -97,7 +97,7 @@ spring:
       on-profile: prod
 
   datasource:
-    url: ${CLIENT_DB_URL:${PROD_DB_URL}}
+    url: ${CLIENT_DB_URL:${CLIENT_PROD_DB_URL:${PROD_DB_URL}}}
     username: ${CLIENT_DB_USERNAME:${PROD_DB_USERNAME}}
     password: ${CLIENT_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver

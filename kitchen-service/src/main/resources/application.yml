@@ -118,7 +118,7 @@ spring:
       on-profile: prod
 
   datasource:
-    url: ${KITCHEN_DB_URL:${PROD_DB_URL}}
+    url: ${KITCHEN_DB_URL:${KITCHEN_PROD_DB_URL:${PROD_DB_URL}}}
     username: ${KITCHEN_DB_USERNAME:${PROD_DB_USERNAME}}
     password: ${KITCHEN_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver

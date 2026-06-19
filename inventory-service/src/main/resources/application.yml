@@ -34,14 +34,14 @@ springdoc:
 # ── External API Keys ────────────────────────────────────────────────────────
 usda:
   api:
-    key: ${USDA_API_KEY}
+    key: ${USDA_API_KEY:}
     url: ${USDA_API_URL:https://api.nal.usda.gov/fdc/v1}
 
 app:
   keys:
-    google: ${GOOGLE_API_KEY}
-    deepseek: ${DEEPSEEK_API_KEY}
-    openrouter: ${OPENROUTER_API_KEY}
+    google: ${GOOGLE_API_KEY:}
+    deepseek: ${DEEPSEEK_API_KEY:}
+    openrouter: ${OPENROUTER_API_KEY:}
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
@@ -109,7 +109,7 @@ spring:
       on-profile: prod
 
   datasource:
-    url: ${INVENTORY_DB_URL:${PROD_DB_URL}}
+    url: ${INVENTORY_DB_URL:${INVENTORY_PROD_DB_URL:${PROD_DB_URL}}}
     username: ${INVENTORY_DB_USERNAME:${PROD_DB_USERNAME}}
     password: ${INVENTORY_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver
