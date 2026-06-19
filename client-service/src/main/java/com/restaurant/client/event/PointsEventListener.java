@@ -61,13 +61,8 @@ public class PointsEventListener {
         log.info("Received PointsEarnedEvent for client: {}, order: {}, points: {}", 
                 event.getClientId(), event.getOrderId(), event.getPointsEarned());
 
-        try {
-            clientProfileService.addPoints(event.getClientId(), event.getPointsEarned(), event.getOrderId());
-            log.info("Successfully added points for client: {}", event.getClientId());
-        } catch (Exception e) {
-            log.error("Failed to add points for client: {}. Error: {}", event.getClientId(), e.getMessage());
-            // Usually earning points doesn't have a failure event in the same way as redemption
-        }
+        clientProfileService.addPoints(event.getClientId(), event.getPointsEarned(), event.getOrderId());
+        log.info("Successfully added points for client: {}", event.getClientId());
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queues.points-redemption-rollback.name}")
@@ -75,11 +70,7 @@ public class PointsEventListener {
         log.info("Received PointRedemptionRollbackRequestedEvent for client: {}, order: {}, points: {}", 
                 event.getClientId(), event.getOrderId(), event.getPointsToRollback());
 
-        try {
-            clientProfileService.rollbackRedemption(event.getClientId(), event.getPointsToRollback(), event.getOrderId());
-            log.info("Successfully rolled back points for order: {}", event.getOrderId());
-        } catch (Exception e) {
-            log.error("Failed to rollback points for order: {}. Error: {}", event.getOrderId(), e.getMessage());
-        }
+        clientProfileService.rollbackRedemption(event.getClientId(), event.getPointsToRollback(), event.getOrderId());
+        log.info("Successfully rolled back points for order: {}", event.getOrderId());
     }
 }

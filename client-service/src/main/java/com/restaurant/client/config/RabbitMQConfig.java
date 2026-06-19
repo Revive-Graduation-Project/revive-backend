@@ -81,9 +81,11 @@ public class RabbitMQConfig {
 
         java.util.Map<String, Class<?>> idClassMapping = new java.util.HashMap<>();
         idClassMapping.put("com.restaurant.auth.event.UserCreatedEvent", UserCreatedEvent.class);
-        idClassMapping.put("com.restaurant.order.events.points.PointRedemptionRequestedEvent", PointRedemptionRequestedEvent.class);
+        idClassMapping.put("com.restaurant.order.events.points.PointRedemptionRequestedEvent",
+                PointRedemptionRequestedEvent.class);
         idClassMapping.put("com.restaurant.order.events.points.PointsEarnedEvent", PointsEarnedEvent.class);
-        idClassMapping.put("com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent", PointRedemptionRollbackRequestedEvent.class);
+        idClassMapping.put("com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent",
+                PointRedemptionRollbackRequestedEvent.class);
         typeMapper.setIdClassMapping(idClassMapping);
 
         converter.setJavaTypeMapper(typeMapper);
@@ -110,7 +112,7 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(clientUserCreatedQueue)
                 .withArgument("x-dead-letter-exchange", exchange)
                 .withArgument("x-dead-letter-routing-key", clientUserCreatedDLQRoutingKey)
-                .withArgument("x-message-ttl", 30000)
+                .withArgument("x-message-ttl", 120000000)
                 .build();
     }
 
@@ -124,7 +126,7 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(pointsRedemptionRequestedQueue)
                 .withArgument("x-dead-letter-exchange", exchange)
                 .withArgument("x-dead-letter-routing-key", pointsRedemptionRequestedDLQRoutingKey)
-                .withArgument("x-message-ttl", 30000)
+                .withArgument("x-message-ttl", 120000000)
                 .build();
     }
 
@@ -138,7 +140,7 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(pointsEarnedQueue)
                 .withArgument("x-dead-letter-exchange", exchange)
                 .withArgument("x-dead-letter-routing-key", pointsEarnedDLQRoutingKey)
-                .withArgument("x-message-ttl", 30000)
+                .withArgument("x-message-ttl", 120000000)
                 .build();
     }
 
@@ -152,7 +154,7 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(pointsRedemptionRollbackQueue)
                 .withArgument("x-dead-letter-exchange", exchange)
                 .withArgument("x-dead-letter-routing-key", pointsRedemptionRollbackDLQRoutingKey)
-                .withArgument("x-message-ttl", 30000)
+                .withArgument("x-message-ttl", 120000000)
                 .build();
     }
 
