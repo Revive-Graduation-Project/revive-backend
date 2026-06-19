@@ -78,7 +78,7 @@ public class TicketServiceImpl implements TicketService {
 
     private ChefProfile autoAssignChef() {
         return chefProfileRepository
-                .findMostAvailableActiveChefs(ChefStatus.ACTIVE, TicketStatus.READY, PageRequest.of(0, 1))
+                .findMostAvailableActiveChefs(ChefStatus.ACTIVE, TicketStatus.PREPARING, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No available chefs to assign ticket")); // ticket cannot be created; therefore, nacking is necessary
@@ -93,7 +93,7 @@ public class TicketServiceImpl implements TicketService {
 
         retrievedTicket.setStatus(status);
 
-        if (status.equals(TicketStatus.READY))
+        if (status == TicketStatus.READY)
             publisher.publishTicketReady(
                     new TicketReadyEvent(retrievedTicket.getOrderId(), id),
                     UUID.randomUUID().toString());
@@ -105,7 +105,7 @@ public class TicketServiceImpl implements TicketService {
     @Override
     public List<KitchenTicketDTO> getActiveTickets() {
 
-        List<KitchenTicket> activeTickets = kitchenTicketRepository.findByStatusNot(TicketStatus.READY);
+        List<KitchenTicket> activeTickets = kitchenTicketRepository.findByStatusNot(TicketStatus.DONE);
         return ticketMapper.toDTOList(activeTickets);
     }
 }

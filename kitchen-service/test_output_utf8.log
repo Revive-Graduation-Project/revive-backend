@@ -1,0 +1,375 @@
+﻿[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.restaurant:kitchen-service:jar:1.0.0
+[WARNING] 'dependencies.dependency.version' for org.jetbrains:annotations:jar is either LATEST or RELEASE (both of them are being deprecated) @ line 21, column 22
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
+[INFO] 
+[INFO] -------------------< com.restaurant:kitchen-service >-------------------
+[INFO] Building kitchen-service 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ kitchen-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ kitchen-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ kitchen-service ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ kitchen-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.3:test (default-test) @ kitchen-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.restaurant.kitchen.service.KitchenServiceImplTest
+[ERROR] Tests run: 15, Failures: 0, Errors: 15, Skipped: 0, Time elapsed: 1.616 s <<< FAILURE! -- in com.restaurant.kitchen.service.KitchenServiceImplTest
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.createChefProfile_WhenDatabaseSaveFails_ShouldThrowRuntimeException -- Time elapsed: 1.460 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateTicketStatus_WhenStatusIsReady_ShouldUpdateSaveAndPublishEvent -- Time elapsed: 0.008 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateTicketStatus_WhenStatusIsNotReady_ShouldUpdateAndSaveWithoutPublishing -- Time elapsed: 0.008 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateChefStatus_WhenChefExists_ShouldUpdateStatusAndSave -- Time elapsed: 0.008 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.createChefProfile_WhenChefAlreadyExists_ShouldRepublishEvent -- Time elapsed: 0.006 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateTicketStatus_WhenTicketDoesNotExist_ShouldThrowException -- Time elapsed: 0.007 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateChefStatus_WhenChefDoesNotExist_ShouldThrowException -- Time elapsed: 0.006 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.getActiveTickets_WhenNoActiveTicketsExist_ShouldThrowException -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateStation_WhenChefExists_ShouldUpdateStationAndSave -- Time elapsed: 0.004 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.createChefProfile_WhenChefIsNew_ShouldSaveAndPublishEvent -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateDisplayName_WhenChefDoesNotExist_ShouldThrowException -- Time elapsed: 0.006 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.createChefProfile_WhenUserIsNotChef_ShouldReturnWithoutSavingAndPublishing -- Time elapsed: 0.006 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.getActiveTickets_WhenActiveTicketsExist_ShouldReturnMappedDtoList -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateStation_WhenChefDoesNotExist_ShouldThrowException -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.restaurant.kitchen.service.KitchenServiceImplTest.updateDisplayName_WhenChefExists_ShouldUpdateTrimmedNameAndSave -- Time elapsed: 0.006 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+	at com.restaurant.kitchen.service.KitchenServiceImplTest.setUp(KitchenServiceImplTest.java:77)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Errors: 
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[ERROR]   KitchenServiceImplTest.setUp:77  Unresolved compilation problems: 
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type UserCreatedEvent
+	The method builder() is undefined for the type ProfileCreatedEvent
+	The method builder() is undefined for the type TicketReadyEvent
+	The method builder() is undefined for the type KitchenTicketDTO
+
+[INFO] 
+[ERROR] Tests run: 15, Failures: 0, Errors: 15, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  4.371 s
+[INFO] Finished at: 2026-03-29T21:29:10+02:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.3:test (default-test) on project kitchen-service: 
+[ERROR] 
+[ERROR] See D:\revive backend\restaurant-microservices\kitchen-service\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -19,6 +19,12 @@
         </processorPath>
         <module name="auth-service" />
       </profile>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="gateway-service" />
+      </profile>
       <profile name="Annotation profile for restaurant-microservices" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -31,6 +37,7 @@
         </processorPath>
         <module name="inventory-service" />
         <module name="order-service" />
+        <module name="payment-service" />
         <module name="kitchen-service" />
         <module name="menu-management-service" />
       </profile>
@@ -50,16 +57,24 @@
         </processorPath>
         <module name="client-service" />
       </profile>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="gateway-service" />
+      </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="auth-service" options="-parameters" />
       <module name="client-service" options="-parameters" />
+      <module name="gateway-service" options="-parameters" />
       <module name="inventory-service" options="-parameters" />
       <module name="kitchen-service" options="-parameters" />
       <module name="menu-management-service" options="-parameters" />
       <module name="order-service" options="-parameters" />
+      <module name="payment-service" options="-parameters" />
       <module name="restaurant-microservices" options="-parameters" />
     </option>
   </component>

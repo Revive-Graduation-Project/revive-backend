@@ -5,6 +5,7 @@ import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.exception.EmailAlreadyExistsException;
 import com.restaurant.auth.repository.UserRepository;
@@ -60,18 +61,17 @@ class AuthServiceTest {
     // ── signup ────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("signup() returns a token and publishes a UserCreatedEvent on success")
-    void signup_success_returnsToken() {
-        SignupRequest request = new SignupRequest("john@example.com", "password123", Role.CLIENT);
+    @DisplayName("signup() returns a message and publishes a UserCreatedEvent on success")
+    void signup_success_returnsMessage() {
+        SignupRequest request = new SignupRequest("john@example.com", "password123", null, null, null, null, null, null, null, null, null, null);
 
         given(userRepository.existsByEmail("john@example.com")).willReturn(false);
         given(passwordEncoder.encode("password123")).willReturn("$2a$hashed");
         given(userRepository.save(any(User.class))).willReturn(savedUser);
-        given(jwtService.generateToken(savedUser)).willReturn("jwt-token");
 
-        AuthResponse response = authService.signup(request);
+        MessageResponse response = authService.signup(request);
 
-        assertThat(response.token()).isEqualTo("jwt-token");
+        assertThat(response.message()).isEqualTo("User registered successfully. Profile creation is pending.");
 
         // Verify the user was persisted with the correct email and hashed password
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
@@ -90,7 +90,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("signup() throws EmailAlreadyExistsException when email is taken")
     void signup_duplicateEmail_throwsException() {
-        SignupRequest request = new SignupRequest("john@example.com", "password123", Role.CLIENT);
+        SignupRequest request = new SignupRequest("john@example.com", "password123", null, null, null, null, null, null, null, null, null, null);
         given(userRepository.existsByEmail("john@example.com")).willReturn(true);
 
         assertThatThrownBy(() -> authService.signup(request))

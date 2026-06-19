@@ -1,12 +1,14 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  MENU-MANAGEMENT-SERVICE — Multi-Environment Configuration                 ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: menu-management-service
-
-  datasource:
-    url: jdbc:postgresql://menu-db:5432/menu_db
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -18,4 +20,96 @@ spring:
         format_sql: true
 
 server:
+  port: 8084
+
+springdoc:
+  api-docs:
+    path: /api/menu/v3/api-docs
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      menu-nutrition:
+        name: menu.nutrition.processed.queue
+        routing-key: menu.nutrition.processed
+        dlq-name: menu.nutrition.processed.queue.dlq
+        dlq-routing-key: menu.nutrition.processed.dlq
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: jdbc:postgresql://localhost:5434/menu_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:postgresql://menu-db:5432/menu_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+server:
   port: 8080
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/menu_db?sslmode=require&channel_binding=require
+    username: neondb_owner
+    password: npg_tHN2wIgpPo6E
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: amqps://jpndmhye:pPZzD9atkwLkSBQwt6bCBV-ATQrBzxCf@seal.lmq.cloudamqp.com/jpndmhye
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

@@ -26,8 +26,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -58,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
+                                "/auth/v3/api-docs",
+                                "/auth/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/index.html")
@@ -83,6 +88,8 @@ public class SecurityConfig {
         return (web) -> web.ignoring().requestMatchers(
                 "/v3/api-docs/**",
                 "/v3/api-docs",
+                "/auth/v3/api-docs",
+                "/auth/v3/api-docs/**",
                 "/swagger-ui/**",
                 "/swagger-ui.html",
                 "/swagger-ui/index.html");

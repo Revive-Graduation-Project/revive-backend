@@ -2,9 +2,12 @@ package com.restaurant.auth.service;
 
 import com.restaurant.auth.config.RabbitMQConfig;
 import com.restaurant.auth.domain.entity.User;
+import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
+import com.restaurant.auth.dto.StaffSignupRequest;
 import com.restaurant.auth.event.UserCreatedEvent;
 import com.restaurant.auth.exception.EmailAlreadyExistsException;
 import com.restaurant.auth.repository.UserRepository;
@@ -22,16 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository        userRepository;
-    private final PasswordEncoder       passwordEncoder;
-    private final JwtService            jwtService;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final RabbitTemplate        rabbitTemplate;
+    private final RabbitTemplate rabbitTemplate;
 
     // ── Signup ────────────────────────────────────────────────────────────────
 
     @Transactional
-    public AuthResponse signup(SignupRequest request) {
+    public MessageResponse signup(SignupRequest request) {
         // 1. Guard: reject duplicate emails
         if (userRepository.existsByEmail(request.email())) {
             throw new EmailAlreadyExistsException(request.email());
@@ -41,7 +44,7 @@ public class AuthService {
         User user = User.builder()
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
-                .role(request.role())
+                .role(Role.CLIENT)
                 .isActive(true)
                 .build();
 
@@ -49,15 +52,80 @@ public class AuthService {
         log.info("User created: id={}, role={}", user.getId(), user.getRole());
 
         // 3. Publish UserCreatedEvent to the shared exchange
-        UserCreatedEvent event = new UserCreatedEvent(user.getId(), user.getRole().name());
+        UserCreatedEvent event = UserCreatedEvent.builder()
+                .id(user.getId())
+                .role(user.getRole().name())
+                .phoneNumber(request.phoneNumber())
+                .age(request.age())
+                .gender(request.gender())
+                .exercisesRegularly(request.exercisesRegularly())
+                .height(request.height())
+                .heightUnit(request.heightUnit())
+                .weight(request.weight())
+                .weightUnit(request.weightUnit())
+                .goal(request.goal())
+                .healthConditions(request.healthConditions())
+                .build();
+                
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.EXCHANGE_NAME,
                 RabbitMQConfig.ROUTING_KEY_CREATED,
                 event);
         log.info("Published UserCreatedEvent for userId={}", user.getId());
 
-        // 4. Return a JWT so the client is immediately authenticated
-        return new AuthResponse(jwtService.generateToken(user));
+        // 4. Return a success message (JWT will be acquired via login later)
+        return new MessageResponse("User registered successfully. Profile creation is pending.");
+    }
+
+    @Transactional
+    public MessageResponse signupStaff(StaffSignupRequest request) {
+        // 1. Guard: never allow creating ADMIN or CLIENT via this endpoint
+        if (request.role() == Role.ADMIN || request.role() == Role.CLIENT) {
+            throw new IllegalArgumentException(
+                    "Staff signup only allows CHEF or MANAGER roles");
+        }
+
+        // 2. Guard: enforce caller-specific permissions
+        //    ADMIN  → can create CHEF, MANAGER
+        //    MANAGER → can only create CHEF
+        String callerRole = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getAuthorities()
+                .iterator().next().getAuthority();
+
+        if ("MANAGER".equals(callerRole) && request.role() != Role.CHEF) {
+            throw new IllegalArgumentException(
+                    "Managers can only create CHEF accounts");
+        }
+
+        // 3. Guard: reject duplicate emails
+        if (userRepository.existsByEmail(request.email())) {
+            throw new EmailAlreadyExistsException(request.email());
+        }
+
+        // 4. Persist the new staff user with a hashed password
+        User user = User.builder()
+                .email(request.email())
+                .password(passwordEncoder.encode(request.password()))
+                .role(request.role())
+                .isActive(true)
+                .build();
+
+        user = userRepository.save(user);
+        log.info("Staff user created: id={}, role={} (by {})", user.getId(), user.getRole(), callerRole);
+
+        // 5. Publish UserCreatedEvent to the shared exchange
+        UserCreatedEvent event = UserCreatedEvent.builder()
+                .id(user.getId())
+                .role(user.getRole().name())
+                .build();
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_CREATED,
+                event);
+        log.info("Published UserCreatedEvent for staff userId={}", user.getId());
+
+        // 6. Return a success message
+        return new MessageResponse("Staff user registered successfully.");
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────

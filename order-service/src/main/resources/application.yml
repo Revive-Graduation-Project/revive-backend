@@ -1,13 +1,14 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  ORDER-SERVICE — Multi-Environment Configuration                           ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: order-service
-
-  datasource:
-    # Uses 'order-db' for Docker, falls back to 'localhost' for IDE
-    url: jdbc:postgresql://${DB_HOST:order-db}:${DB_PORT:5432}/order_db
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -42,9 +43,13 @@ spring:
         default-requeue-rejected: false
 
 server:
-  # Defaults to 8080 (Docker standard), can be overridden locally via ENV
-  port: ${SERVER_PORT:8080}
+  port: 8085
 
+springdoc:
+  api-docs:
+    path: /api/orders/v3/api-docs
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
     exchange: restaurant.events.exchange
@@ -74,3 +79,65 @@ app:
   services:
     menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
     payment-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: jdbc:postgresql://localhost:5435/order_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:postgresql://order-db:5432/order_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+server:
+  port: 8080
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/order_db?sslmode=require&channel_binding=require
+    username: neondb_owner
+    password: npg_tHN2wIgpPo6E
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

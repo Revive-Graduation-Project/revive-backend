@@ -1,0 +1,225 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  GATEWAY-SERVICE — Multi-Environment Configuration                         ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, distinct service ports)        ║
+# ║  dev      → Docker Compose run  (container hostnames, port 8080)           ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+spring:
+  application:
+    name: gateway-service
+
+  cloud:
+    gateway:
+      # ── Global CORS — lets browsers talk to the gateway ────────────
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            exposed-headers: "*"
+            allow-credentials: false
+            max-age: 3600
+
+      routes:
+        # ── Auth Service (login, signup) ───────────────────────────────
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/auth/**
+
+        # ── Menu Management Service (menu + ingredients) ───────────────
+        - id: menu-service-menu
+          uri: ${MENU_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/menu/**
+
+        - id: menu-service-ingredients
+          uri: ${MENU_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/ingredients/**
+
+        # ── Kitchen Service ────────────────────────────────────────────
+        - id: kitchen-service
+          uri: ${KITCHEN_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/kitchen/**
+
+        # ── Inventory Service ──────────────────────────────────────────
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/inventory/**
+
+        # ── Order Service ──────────────────────────────────────────────
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/orders/**
+
+        # ── Client Service ─────────────────────────────────────────────
+        - id: client-service
+          uri: ${CLIENT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/clients/**
+
+        # ── Payment Service ────────────────────────────────────────────
+        - id: payment-service
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8088}
+          predicates:
+            - Path=/api/payments/**
+
+# ── Shared JWT secret (MUST match auth-service's app.jwt.secret) ───────
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+# ── Swagger UI / OpenAPI configuration ─────────────────────────────────
+springdoc:
+  swagger-ui:
+    urls:
+      - name: Auth Service
+        url: /auth/v3/api-docs
+      - name: Menu Management Service
+        url: /api/menu/v3/api-docs
+      - name: Kitchen Service
+        url: /api/kitchen/v3/api-docs
+      - name: Inventory Service
+        url: /api/inventory/v3/api-docs
+      - name: Order Service
+        url: /api/orders/v3/api-docs
+      - name: Client Service
+        url: /api/clients/v3/api-docs
+      - name: Payment Service
+        url: /api/payments/v3/api-docs
+
+# ── Actuator ───────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+server:
+  port: 8080
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run (uses env-var defaults above)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/auth/**
+
+        - id: menu-service-menu
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/menu/**
+
+        - id: menu-service-ingredients
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/ingredients/**
+
+        - id: kitchen-service
+          uri: http://kitchen-service:8080
+          predicates:
+            - Path=/api/kitchen/**
+
+        - id: inventory-service
+          uri: http://inventory-service:8080
+          predicates:
+            - Path=/api/inventory/**
+
+        - id: order-service
+          uri: http://order-service:8080
+          predicates:
+            - Path=/api/orders/**
+
+        - id: client-service
+          uri: http://client-service:8080
+          predicates:
+            - Path=/api/clients/**
+
+        - id: payment-service
+          uri: http://payment-service:8080
+          predicates:
+            - Path=/api/payments/**
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service.railway.internal:8080
+          predicates:
+            - Path=/auth/**
+
+        - id: menu-service-menu
+          uri: http://menu-management-service.railway.internal:8080
+          predicates:
+            - Path=/api/menu/**
+
+        - id: menu-service-ingredients
+          uri: http://menu-management-service.railway.internal:8080
+          predicates:
+            - Path=/api/ingredients/**
+
+        - id: kitchen-service
+          uri: http://kitchen-service.railway.internal:8080
+          predicates:
+            - Path=/api/kitchen/**
+
+        - id: inventory-service
+          uri: http://inventory-service.railway.internal:8080
+          predicates:
+            - Path=/api/inventory/**
+
+        - id: order-service
+          uri: http://order-service.railway.internal:8080
+          predicates:
+            - Path=/api/orders/**
+
+        - id: client-service
+          uri: http://client-service.railway.internal:8080
+          predicates:
+            - Path=/api/clients/**
+
+        - id: payment-service
+          uri: http://payment-service.railway.internal:8080
+          predicates:
+            - Path=/api/payments/**
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"
