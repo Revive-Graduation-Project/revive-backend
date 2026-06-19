@@ -14,6 +14,8 @@ public record MealDTO(
         @NotBlank(message = "Meal name is required")
         String name,
 
+        String description,
+
         List<Map<String, Object>> nutrients,
 
         @NotNull(message = "Price is required")
@@ -24,6 +26,10 @@ public record MealDTO(
         String category,
 
         Boolean isActive,
+
+        Boolean hasDiscount,
+
+        Double discountPercentage,
 
         @Valid
         List<MealIngredientDTO> mealIngredients) {

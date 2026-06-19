@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,8 +89,7 @@ public class AuthService {
         // 2. Guard: enforce caller-specific permissions
         //    ADMIN  → can create CHEF, MANAGER
         //    MANAGER → can only create CHEF
-        String callerRole = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getAuthorities()
+        String callerRole = SecurityContextHolder.getContext().getAuthentication().getAuthorities()
                 .iterator().next().getAuthority();
 
         if ("MANAGER".equals(callerRole) && request.role() != Role.CHEF) {

@@ -1,5 +1,6 @@
 package com.restaurant.menu.controller;
 
+import com.restaurant.menu.dto.DiscountRequest;
 import com.restaurant.menu.dto.MealDTO;
 import com.restaurant.menu.dto.MealRequest;
 import com.restaurant.menu.service.MealService;
@@ -24,7 +25,11 @@ public class MenuController {
     private final MealService mealService;
 
     @GetMapping
-    public ResponseEntity<List<MealDTO>> getAllMeals() {
+    public ResponseEntity<List<MealDTO>> getAllMeals(
+            @RequestParam(value = "hasDiscount", required = false) Boolean hasDiscount) {
+        if (hasDiscount != null) {
+            return ResponseEntity.ok(mealService.getMealsByDiscount(hasDiscount));
+        }
         return ResponseEntity.ok(mealService.getAllMeals());
     }
 
@@ -53,6 +58,18 @@ public class MenuController {
             return forbidden(role);
         }
         MealDTO updated = mealService.updateMeal(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PatchMapping("/{id}/discount")
+    public ResponseEntity<?> updateDiscount(
+            @PathVariable Long id,
+            @Valid @RequestBody DiscountRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role)) {
+            return forbidden(role);
+        }
+        MealDTO updated = mealService.updateDiscount(id, request);
         return ResponseEntity.ok(updated);
     }
 

@@ -15,14 +15,14 @@ spring:
       # ── Global CORS — lets browsers talk to the gateway ────────────
       globalcors:
         cors-configurations:
-          '[/**]':
+          "[/**]":
             allowed-origins:
               - "http://localhost:5173"
               - "http://localhost:3000"
             allowed-methods: "*"
             allowed-headers: "*"
             exposed-headers: "*"
-            allow-credentials: false
+            allow-credentials: true
             max-age: 3600
 
       routes:
@@ -107,6 +107,7 @@ management:
 server:
   port: 8080
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run (uses env-var defaults above)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -158,10 +159,13 @@ spring:
           predicates:
             - Path=/api/clients/**
 
+<<<<<<< HEAD
         - id: payment-service
           uri: http://payment-service:8080
           predicates:
             - Path=/api/payments/**
+=======
+>>>>>>> acc46a7a8fd76bf9aa15992d1d6a33a5384e3a63
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PROD profile — Railway deployment

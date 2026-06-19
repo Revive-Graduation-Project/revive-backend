@@ -9,6 +9,8 @@ import java.util.List;
 public record MealRequest(
         @NotBlank(message = "Meal name is required")
         String name,
+
+        String description,
         
         @NotNull(message = "Price is required")
         @Positive(message = "Price must be greater than 0")

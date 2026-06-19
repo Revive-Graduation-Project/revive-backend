@@ -2,6 +2,7 @@ package com.restaurant.menu.service.impl;
 
 import com.restaurant.menu.dto.IngredientNutrition;
 import com.restaurant.menu.dto.MealDTO;
+import com.restaurant.menu.dto.DiscountRequest;
 import com.restaurant.menu.dto.MealNutrition;
 import com.restaurant.menu.dto.NutrientInfo;
 import com.restaurant.menu.entity.Ingredient;
@@ -47,11 +48,13 @@ public class MealServiceImpl implements MealService {
             Meal meal = mealRepository.findByName(mealNutrition.mealName())
                     .orElseGet(() -> Meal.builder()
                             .name(mealNutrition.mealName())
+                            .description(mealNutrition.description())
                             .isActive(true)
                             .build());
 
             meal.setCategory(mealNutrition.category());
             meal.setPrice(mealNutrition.price());
+            meal.setDescription(mealNutrition.description());
 
             List<MealIngredient> mealIngredients = new ArrayList<>();
 
@@ -132,6 +135,7 @@ public class MealServiceImpl implements MealService {
 
         Meal meal = Meal.builder()
                 .name(request.name())
+                .description(request.description())
                 .price(request.price())
                 .category(request.category())
                 .isActive(true)
@@ -148,6 +152,7 @@ public class MealServiceImpl implements MealService {
                 .orElseThrow(() -> new MealNotFoundException(id));
 
         meal.setName(request.name());
+        meal.setDescription(request.description());
         meal.setPrice(request.price());
         meal.setCategory(request.category());
 
@@ -164,6 +169,33 @@ public class MealServiceImpl implements MealService {
         // MealIngredient records will be deleted automatically due to cascade/orphan removal
         // but the actual Ingredient entities remain untouched.
         mealRepository.delete(meal);
+    }
+
+    @Override
+    @Transactional
+    public MealDTO updateDiscount(Long id, DiscountRequest request) {
+        log.info("Updating discount for meal: {}", id);
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new MealNotFoundException(id));
+
+        meal.setHasDiscount(request.hasDiscount());
+        meal.setDiscountPercentage(
+                Boolean.TRUE.equals(request.hasDiscount()) && request.discountPercentage() != null
+                        ? request.discountPercentage()
+                        : 0.0);
+
+        Meal saved = mealRepository.save(meal);
+        return mealMapper.toDTO(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MealDTO> getMealsByDiscount(Boolean hasDiscount) {
+        log.info("Fetching meals with hasDiscount={}", hasDiscount);
+        if (hasDiscount == null) {
+            return mealMapper.toDTOList(mealRepository.findAll());
+        }
+        return mealMapper.toDTOList(mealRepository.findByHasDiscount(hasDiscount));
     }
 
     private MealDTO processMealIngredients(Meal meal, List<MealRequest.IngredientQuantity> ingredientRequests) {

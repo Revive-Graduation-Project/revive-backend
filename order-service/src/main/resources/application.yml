@@ -49,6 +49,7 @@ springdoc:
   api-docs:
     path: /api/orders/v3/api-docs
 
+<<<<<<< HEAD
 # ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
@@ -79,6 +80,8 @@ app:
   services:
     menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
     payment-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
+=======
+>>>>>>> acc46a7a8fd76bf9aa15992d1d6a33a5384e3a63
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run
@@ -94,6 +97,7 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEV profile — Docker Compose run
@@ -113,6 +117,7 @@ spring:
 server:
   port: 8080
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  PROD profile — Railway deployment
 # ─────────────────────────────────────────────────────────────────────────────
@@ -123,9 +128,9 @@ spring:
       on-profile: prod
 
   datasource:
-    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/order_db?sslmode=require&channel_binding=require
-    username: neondb_owner
-    password: npg_tHN2wIgpPo6E
+    url: ${ORDER_DB_URL:${ORDER_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${ORDER_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${ORDER_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver
 
   jpa:

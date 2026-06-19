@@ -25,6 +25,9 @@ public class Meal {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(name = "description")
+    private String description;
+
     /**
      * Stores the full list of nutrients as a JSON column.
      * Each entry has: nutrientName, value, unitName.
@@ -47,6 +50,14 @@ public class Meal {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
+
+    @Builder.Default
+    @Column(name = "has_discount", nullable = false)
+    private Boolean hasDiscount = false;
+
+    @Builder.Default
+    @Column(name = "discount_percentage", nullable = false)
+    private Double discountPercentage = 0.0;
 
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MealIngredient> mealIngredients;
