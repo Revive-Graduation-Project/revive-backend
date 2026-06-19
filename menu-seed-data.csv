@@ -1,0 +1,6 @@
+meal_name,category,price,description,ingredients
+Cheeseburger,Burger,12.99,"A juicy beef patty cooked to perfection, topped with melted cheddar cheese, fresh lettuce, and tomatoes inside a soft toasted bun.","Beef Patty: 150 g; Cheddar Cheese: 30 g; Burger Bun: 1 piece; Lettuce: 10 g; Tomato: 15 g"
+Spaghetti Carbonara,Pasta,15.50,"Classic Roman pasta dish made with eggs, hard cheese, cured pork, and black pepper.","Spaghetti: 100 g; Pancetta: 50 g; Egg Yolk: 2 pieces; Pecorino Romano: 30 g; Black Pepper: 2 g"
+Caesar Salad,Salad,10.99,"Crisp romaine lettuce tossed in creamy Caesar dressing, topped with parmesan, crunchy croutons, and grilled chicken breast.","Romaine Lettuce: 150 g; Caesar Dressing: 30 ml; Croutons: 20 g; Parmesan Cheese: 15 g; Grilled Chicken: 100 g"
+Margherita Pizza,Pizza,13.99,"Authentic Italian pizza topped with fresh tomato sauce, creamy mozzarella cheese, fresh basil leaves, and a drizzle of olive oil.","Pizza Dough: 250 g; Tomato Sauce: 80 g; Fresh Mozzarella: 120 g; Basil Leaves: 5 g; Olive Oil: 10 ml"
+Lava Cake,Dessert,7.99,"Rich chocolate cake with a warm, luscious molten chocolate center, served warm.","Dark Chocolate: 80 g; Butter: 40 g; Sugar: 30 g; Eggs: 2 pieces; Flour: 20 g"
