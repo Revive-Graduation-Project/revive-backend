@@ -33,14 +33,12 @@ EOF
 # Copy POM first (dependency caching layer)
 COPY pom.xml ./pom.xml
 
-# Download dependencies — ~/.m2 is persisted in a BuildKit cache volume
-# so jars are NOT re-downloaded on every build (only when pom.xml changes).
-RUN mvn -f gateway-service/pom.xml dependency:go-offline -B
-
+# Download dependencies (Docker layer caching will cache this step if pom.xml doesn't change)
+RUN mvn dependency:go-offline -B
 
 # Copy source and build
 COPY src ./src
-RUN mvn -f gateway-service/pom.xml clean package -DskipTests -B
+RUN mvn clean package -DskipTests -B
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy
