@@ -17,7 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -84,6 +86,14 @@ public class ClientProfileServiceImpl implements ClientProfileService {
 
         clientProfileRepository.save(profile);
         log.info("Successfully created ClientProfile for user ID: {}", event.getId());
+    }
+
+    @Override
+    public List<ClientProfileDto> getAllProfiles() {
+        return clientProfileRepository.findAll()
+                .stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
     }
 
     @Override

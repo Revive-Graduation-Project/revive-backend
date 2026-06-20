@@ -37,7 +37,7 @@ public class RabbitMQConfig {
     private String ticketReadyRoutingKey;
 
     // payment.succeeded — payment marks transaction success
-    @Value("${app.rabbitmq.queues.payment.succeeded.name}")
+    @Value("${app.rabbitmq.queues.payment-succeeded.name}")
     private String paymentSucceededQueue;
 
     @Value("${app.rabbitmq.queues.payment-succeeded.routing-key}")

@@ -40,6 +40,13 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/orders/v3/api-docs",
+                                "/api/orders/v3/api-docs/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .requestMatchers("/api/orders/**").hasRole("CLIENT")
                         .anyRequest().authenticated()
                 )

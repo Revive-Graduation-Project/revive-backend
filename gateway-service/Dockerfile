@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
 # Standalone build — gateway-service is NOT a child of the parent POM,
 # so we only need its own pom.xml (no root pom.xml required).
@@ -32,12 +33,15 @@ EOF
 # Copy POM first (dependency caching layer)
 COPY pom.xml ./pom.xml
 
-# Download dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B
+# Download dependencies — ~/.m2 is persisted in a BuildKit cache volume
+# so jars are NOT re-downloaded on every build (only when pom.xml changes).
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn dependency:go-offline -B
 
 # Copy source and build
 COPY src ./src
-RUN mvn clean package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn clean package -DskipTests -B
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy

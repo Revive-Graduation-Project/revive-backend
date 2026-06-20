@@ -24,7 +24,7 @@ spring:
       resourceserver:
         jwt:
           secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-          jws-algorithm: HS384
+          jws-algorithms: HS384
 
   rabbitmq:
     # Uses 'rabbitmq' for Docker, falls back to 'localhost' for IDE
