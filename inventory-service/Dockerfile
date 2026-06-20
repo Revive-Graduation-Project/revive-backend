@@ -8,12 +8,10 @@ COPY inventory-service/pom.xml ./inventory-service/pom.xml
 
 # Download all dependencies — ~/.m2 is persisted in a BuildKit cache volume
 # so jars are NOT re-downloaded on every build (only when pom.xml changes).
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -f inventory-service/pom.xml dependency:go-offline -B
+RUN mvn -f inventory-service/pom.xml dependency:go-offline -B
 
 COPY inventory-service/src ./inventory-service/src
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -f inventory-service/pom.xml clean package -DskipTests -B
+RUN mvn -f inventory-service/pom.xml clean package -DskipTests -B
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy

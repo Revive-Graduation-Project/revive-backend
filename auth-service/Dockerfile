@@ -10,13 +10,11 @@ COPY auth-service/pom.xml ./auth-service/pom.xml
 
 # Download all dependencies — ~/.m2 is persisted in a BuildKit cache volume
 # so jars are NOT re-downloaded on every build (only when pom.xml changes).
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -f auth-service/pom.xml dependency:go-offline -B
+RUN mvn -f auth-service/pom.xml dependency:go-offline -B
 
 # Copy source and build
 COPY auth-service/src ./auth-service/src
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -f auth-service/pom.xml clean package -DskipTests -B
+RUN mvn -f auth-service/pom.xml clean package -DskipTests -B
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy
