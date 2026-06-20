@@ -130,6 +130,9 @@ spring:
     password: ${ORDER_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver
 
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
   jpa:
     hibernate:
       ddl-auto: update
