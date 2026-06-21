@@ -133,16 +133,21 @@ public class SecurityConfig {
             if (StringUtils.hasText(email)
                     && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // loadUserByUsername() interface parameter is called 'username',
-                // but here we pass the email — our UserDetailsService queries by email.
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                try {
+                    // loadUserByUsername() interface parameter is called 'username',
+                    // but here we pass the email — our UserDetailsService queries by email.
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    if (jwtService.isTokenValid(jwt, userDetails)) {
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        authToken.setDetails(
+                                new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    }
+                } catch (Exception e) {
+                    // Fail silently so that public/ignored routes (like Swagger) can still be accessed
+                    // even if a stale/invalid token is present in the request.
                 }
             }
 
