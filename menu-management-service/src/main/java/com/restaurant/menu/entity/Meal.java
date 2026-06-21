@@ -2,6 +2,7 @@ package com.restaurant.menu.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -53,10 +54,12 @@ public class Meal {
 
     @Builder.Default
     @Column(name = "has_discount", nullable = false)
+    @ColumnDefault("false")
     private Boolean hasDiscount = false;
 
     @Builder.Default
     @Column(name = "discount_percentage", nullable = false)
+    @ColumnDefault("0.0")
     private Double discountPercentage = 0.0;
 
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
