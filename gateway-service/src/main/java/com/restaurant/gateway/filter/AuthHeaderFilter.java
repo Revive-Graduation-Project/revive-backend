@@ -35,6 +35,7 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
             "/auth/signup",
             "/actuator/health",
             "/v3/api-docs",
+            "/auth/v3/api-docs",
             "/swagger-ui",
             "/swagger-ui.html",
             "/webjars/");
@@ -85,7 +86,8 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
 
         } catch (Exception e) {
             log.warn("JWT validation failed for path {}: {}", path, e.getMessage());
-            // If token is invalid but the route is public, ignore the token and let them through
+            // If token is invalid but the route is public, ignore the token and let them
+            // through
             if (isPublic) {
                 return chain.filter(exchange);
             }
