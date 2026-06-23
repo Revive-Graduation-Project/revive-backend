@@ -1,4 +1,4 @@
 package com.restaurant.auth.dto;
 
-public record AuthResponse(String token, String role, Long userId, String emailString) {
+public record AuthResponse(String token, String role, Long userId, String emailString, String firstName, String lastName) {
 }

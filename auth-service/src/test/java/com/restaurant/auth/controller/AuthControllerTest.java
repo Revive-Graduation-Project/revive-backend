@@ -52,9 +52,10 @@ class AuthControllerTest {
         @Test
         @DisplayName("POST /auth/signup returns 201 and a message for a valid request")
         void signup_validRequest_returns201() throws Exception {
-                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", null, null, null, null,
-                                null, null, null, null, null, null);
-                MessageResponse response = new MessageResponse("User registered successfully. Profile creation is pending.");
+                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", "John", "Doe", null, null,
+                                null, null, null, null, null, null, null, null);
+                MessageResponse response = new MessageResponse(
+                                "User registered successfully. Profile creation is pending.");
 
                 given(authService.signup(request)).willReturn(response);
 
@@ -62,14 +63,15 @@ class AuthControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.message").value("User registered successfully. Profile creation is pending."));
+                                .andExpect(jsonPath("$.message")
+                                                .value("User registered successfully. Profile creation is pending."));
         }
 
         @Test
         @DisplayName("POST /auth/signup returns 400 when username is blank")
         void signup_blankUsername_returns400() throws Exception {
-                SignupRequest request = new SignupRequest("", "secret123", null, null, null, null, null, null, null,
-                                null, null, null); // blank email triggers
+                SignupRequest request = new SignupRequest("", "secret123", "John", "Doe", null, null, null, null, null,
+                                null, null, null, null, null); // blank email triggers
                 // @NotBlank
 
                 mockMvc.perform(post("/auth/signup")
@@ -82,8 +84,8 @@ class AuthControllerTest {
         @Test
         @DisplayName("POST /auth/signup returns 400 when password is too short")
         void signup_shortPassword_returns400() throws Exception {
-                SignupRequest request = new SignupRequest("johndoe@example.com", "abc", null, null, null, null, null,
-                                null, null, null, null, null);
+                SignupRequest request = new SignupRequest("johndoe@example.com", "abc", "John", "Doe", null, null, null,
+                                null, null, null, null, null, null, null);
 
                 mockMvc.perform(post("/auth/signup")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -114,8 +116,8 @@ class AuthControllerTest {
         @Test
         @DisplayName("POST /auth/signup returns 409 when username is already taken")
         void signup_duplicateUsername_returns409() throws Exception {
-                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", null, null, null, null,
-                                null, null, null, null, null, null);
+                SignupRequest request = new SignupRequest("johndoe@example.com", "secret123", "John", "Doe", null, null,
+                                null, null, null, null, null, null, null, null);
 
                 given(authService.signup(request))
                                 .willThrow(new EmailAlreadyExistsException("johndoe@example.com"));
@@ -134,7 +136,7 @@ class AuthControllerTest {
         @DisplayName("POST /auth/login returns 200 and a token for valid credentials")
         void login_validRequest_returns200() throws Exception {
                 AuthRequest request = new AuthRequest("johndoe@example.com", "secret123");
-                AuthResponse response = new AuthResponse("jwt-token-xyz", "CLIENT", 1L, "johndoe@example.com");
+                AuthResponse response = new AuthResponse("jwt-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
 
                 given(authService.login(request)).willReturn(response);
 
