@@ -16,6 +16,12 @@ public record StaffSignupRequest(
         @Size(min = 6, message = "Password must be at least 6 characters")
         String password,
 
+        @NotBlank(message = "First name must not be blank")
+        String firstName,
+
+        @NotBlank(message = "Last name must not be blank")
+        String lastName,
+
         @NotNull(message = "Role must not be null")
         Role role
 

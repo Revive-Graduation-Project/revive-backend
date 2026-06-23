@@ -14,6 +14,8 @@ import java.util.List;
 public class UserCreatedEvent {
     private Long id;
     private String role;
+    private String firstName;
+    private String lastName;
     
     // Client Profile fields
     private String phoneNumber;
