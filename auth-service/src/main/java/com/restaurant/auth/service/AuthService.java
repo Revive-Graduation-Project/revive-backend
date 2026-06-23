@@ -53,13 +53,13 @@ public class AuthService {
                                 .isActive(true)
                                 .build();
 
-                user = userRepository.save(user);
-                log.info("User created: id={}, role={}", user.getId(), user.getRole());
+                User savedUser = userRepository.save(user);
+                log.info("User created: id={}, role={}", savedUser.getId(), savedUser.getRole());
 
                 // 3. Publish UserCreatedEvent to the shared exchange
                 UserCreatedEvent event = UserCreatedEvent.builder()
-                                .id(user.getId())
-                                .role(user.getRole().name())
+                                .id(savedUser.getId())
+                                .role(savedUser.getRole().name())
                                 .phoneNumber(request.phoneNumber())
                                 .age(request.age())
                                 .gender(request.gender())
@@ -79,7 +79,7 @@ public class AuthService {
                                                 RabbitMQConfig.EXCHANGE_NAME,
                                                 RabbitMQConfig.ROUTING_KEY_CLIENT_CREATED,
                                                 event);
-                                log.info("Published UserCreatedEvent for userId={}", user.getId());
+                                log.info("Published UserCreatedEvent for userId={}", savedUser.getId());
                         }
                 });
 
@@ -121,16 +121,16 @@ public class AuthService {
                                 .isActive(true)
                                 .build();
 
-                user = userRepository.save(user);
-                log.info("Staff user created: id={}, role={} (by {})", user.getId(), user.getRole(), callerRole);
+                User savedUser = userRepository.save(user);
+                log.info("Staff user created: id={}, role={} (by {})", savedUser.getId(), savedUser.getRole(), callerRole);
 
                 // 5. Publish UserCreatedEvent to the shared exchange only if it's a CHEF role
-                if (user.getRole() == Role.CHEF) {
+                if (savedUser.getRole() == Role.CHEF) {
                         UserCreatedEvent event = UserCreatedEvent.builder()
-                                        .id(user.getId())
-                                        .role(user.getRole().name())
-                                        .firstName(user.getFirstName())
-                                        .lastName(user.getLastName())
+                                        .id(savedUser.getId())
+                                        .role(savedUser.getRole().name())
+                                        .firstName(savedUser.getFirstName())
+                                        .lastName(savedUser.getLastName())
                                         .build();
                         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                                 @Override
@@ -139,11 +139,11 @@ public class AuthService {
                                                         RabbitMQConfig.EXCHANGE_NAME,
                                                         RabbitMQConfig.ROUTING_KEY_CHEF_CREATED,
                                                         event);
-                                        log.info("Published UserCreatedEvent for chef userId={}", user.getId());
+                                        log.info("Published UserCreatedEvent for chef userId={}", savedUser.getId());
                                 }
                         });
                 }
-                log.info("Finished staff user creation for userId={}", user.getId());
+                log.info("Finished staff user creation for userId={}", savedUser.getId());
 
                 // 6. Return a success message
                 return new MessageResponse("Staff user registered successfully.");
@@ -161,9 +161,10 @@ public class AuthService {
 
                 User user = userRepository.findByEmail(request.email())
                                 .orElseThrow(() -> new IllegalStateException(
-                                                 "User authenticated but not found — this should never happen"));
+                                                "User authenticated but not found — this should never happen"));
 
                 log.info("User logged in: id={}", user.getId());
-                return new AuthResponse(jwtService.generateToken(user), user.getRole().name(), user.getId(), user.getEmail(), user.getFirstName(), user.getLastName());
+                return new AuthResponse(jwtService.generateToken(user), user.getRole().name(), user.getId(),
+                                user.getEmail(), user.getFirstName(), user.getLastName());
         }
 }
