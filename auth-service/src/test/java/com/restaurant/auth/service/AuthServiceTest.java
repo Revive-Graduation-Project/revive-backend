@@ -53,6 +53,8 @@ class AuthServiceTest {
                 .id(1L)
                 .email("john@example.com")
                 .password("$2a$hashed")
+                .firstName("John")
+                .lastName("Doe")
                 .role(Role.CLIENT)
                 .isActive(true)
                 .build();
@@ -63,7 +65,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("signup() returns a message and publishes a UserCreatedEvent on success")
     void signup_success_returnsMessage() {
-        SignupRequest request = new SignupRequest("john@example.com", "password123", null, null, null, null, null, null, null, null, null, null);
+        SignupRequest request = new SignupRequest("john@example.com", "password123", "John", "Doe", null, null, null, null, null, null, null, null, null, null);
 
         given(userRepository.existsByEmail("john@example.com")).willReturn(false);
         given(passwordEncoder.encode("password123")).willReturn("$2a$hashed");
@@ -73,24 +75,26 @@ class AuthServiceTest {
 
         assertThat(response.message()).isEqualTo("User registered successfully. Profile creation is pending.");
 
-        // Verify the user was persisted with the correct email and hashed password
+        // Verify the user was persisted with the correct email, hashed password, and names
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());
         assertThat(userCaptor.getValue().getEmail()).isEqualTo("john@example.com");
         assertThat(userCaptor.getValue().getPassword()).isEqualTo("$2a$hashed");
+        assertThat(userCaptor.getValue().getFirstName()).isEqualTo("John");
+        assertThat(userCaptor.getValue().getLastName()).isEqualTo("Doe");
         assertThat(userCaptor.getValue().getRole()).isEqualTo(Role.CLIENT);
 
         // Verify RabbitMQ publish (any(Object.class) disambiguates the overload)
         verify(rabbitTemplate).convertAndSend(
                 eq(RabbitMQConfig.EXCHANGE_NAME),
-                eq(RabbitMQConfig.ROUTING_KEY_CREATED),
+                eq(RabbitMQConfig.ROUTING_KEY_CLIENT_CREATED),
                 any(Object.class));
     }
 
     @Test
     @DisplayName("signup() throws EmailAlreadyExistsException when email is taken")
     void signup_duplicateEmail_throwsException() {
-        SignupRequest request = new SignupRequest("john@example.com", "password123", null, null, null, null, null, null, null, null, null, null);
+        SignupRequest request = new SignupRequest("john@example.com", "password123", "John", "Doe", null, null, null, null, null, null, null, null, null, null);
         given(userRepository.existsByEmail("john@example.com")).willReturn(true);
 
         assertThatThrownBy(() -> authService.signup(request))

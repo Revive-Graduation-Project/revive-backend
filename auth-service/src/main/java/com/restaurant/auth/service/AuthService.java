@@ -20,6 +20,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -45,6 +47,8 @@ public class AuthService {
                 User user = User.builder()
                                 .email(request.email())
                                 .password(passwordEncoder.encode(request.password()))
+                                .firstName(request.firstName())
+                                .lastName(request.lastName())
                                 .role(Role.CLIENT)
                                 .isActive(true)
                                 .build();
@@ -68,11 +72,16 @@ public class AuthService {
                                 .healthConditions(request.healthConditions())
                                 .build();
 
-                rabbitTemplate.convertAndSend(
-                                RabbitMQConfig.EXCHANGE_NAME,
-                                RabbitMQConfig.ROUTING_KEY_CREATED,
-                                event);
-                log.info("Published UserCreatedEvent for userId={}", user.getId());
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                                rabbitTemplate.convertAndSend(
+                                                RabbitMQConfig.EXCHANGE_NAME,
+                                                RabbitMQConfig.ROUTING_KEY_CLIENT_CREATED,
+                                                event);
+                                log.info("Published UserCreatedEvent for userId={}", user.getId());
+                        }
+                });
 
                 // 4. Return a success message (JWT will be acquired via login later)
                 return new MessageResponse("User registered successfully. Profile creation is pending.");
@@ -106,6 +115,8 @@ public class AuthService {
                 User user = User.builder()
                                 .email(request.email())
                                 .password(passwordEncoder.encode(request.password()))
+                                .firstName(request.firstName())
+                                .lastName(request.lastName())
                                 .role(request.role())
                                 .isActive(true)
                                 .build();
@@ -113,16 +124,26 @@ public class AuthService {
                 user = userRepository.save(user);
                 log.info("Staff user created: id={}, role={} (by {})", user.getId(), user.getRole(), callerRole);
 
-                // 5. Publish UserCreatedEvent to the shared exchange
-                UserCreatedEvent event = UserCreatedEvent.builder()
-                                .id(user.getId())
-                                .role(user.getRole().name())
-                                .build();
-                rabbitTemplate.convertAndSend(
-                                RabbitMQConfig.EXCHANGE_NAME,
-                                RabbitMQConfig.ROUTING_KEY_CREATED,
-                                event);
-                log.info("Published UserCreatedEvent for staff userId={}", user.getId());
+                // 5. Publish UserCreatedEvent to the shared exchange only if it's a CHEF role
+                if (user.getRole() == Role.CHEF) {
+                        UserCreatedEvent event = UserCreatedEvent.builder()
+                                        .id(user.getId())
+                                        .role(user.getRole().name())
+                                        .firstName(user.getFirstName())
+                                        .lastName(user.getLastName())
+                                        .build();
+                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                                @Override
+                                public void afterCommit() {
+                                        rabbitTemplate.convertAndSend(
+                                                        RabbitMQConfig.EXCHANGE_NAME,
+                                                        RabbitMQConfig.ROUTING_KEY_CHEF_CREATED,
+                                                        event);
+                                        log.info("Published UserCreatedEvent for chef userId={}", user.getId());
+                                }
+                        });
+                }
+                log.info("Finished staff user creation for userId={}", user.getId());
 
                 // 6. Return a success message
                 return new MessageResponse("Staff user registered successfully.");
@@ -140,9 +161,9 @@ public class AuthService {
 
                 User user = userRepository.findByEmail(request.email())
                                 .orElseThrow(() -> new IllegalStateException(
-                                                "User authenticated but not found — this should never happen"));
+                                                 "User authenticated but not found — this should never happen"));
 
                 log.info("User logged in: id={}", user.getId());
-                return new AuthResponse(jwtService.generateToken(user), user.getRole().name(), user.getId(), user.getEmail());
+                return new AuthResponse(jwtService.generateToken(user), user.getRole().name(), user.getId(), user.getEmail(), user.getFirstName(), user.getLastName());
         }
 }

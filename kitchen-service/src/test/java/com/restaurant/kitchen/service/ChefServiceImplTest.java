@@ -153,6 +153,8 @@ class ChefServiceImplTest {
         UserCreatedEvent event = new UserCreatedEvent();
         event.setRole("CHEF");
         event.setId(1L);
+        event.setFirstName("Chef");
+        event.setLastName("John");
 
         ChefProfile existingChef = new ChefProfile();
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.of(existingChef));
@@ -168,6 +170,8 @@ class ChefServiceImplTest {
         UserCreatedEvent event = new UserCreatedEvent();
         event.setRole("CHEF");
         event.setId(1L);
+        event.setFirstName("Chef");
+        event.setLastName("John");
 
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
 
@@ -182,6 +186,8 @@ class ChefServiceImplTest {
         UserCreatedEvent event = new UserCreatedEvent();
         event.setRole("CHEF");
         event.setId(1L);
+        event.setFirstName("Chef");
+        event.setLastName("John");
 
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
         when(chefProfileRepository.save(any(ChefProfile.class))).thenThrow(new RuntimeException("DB error"));

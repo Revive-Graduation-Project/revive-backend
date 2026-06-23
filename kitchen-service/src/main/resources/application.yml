@@ -51,7 +51,7 @@ app:
     queues:
       user-created:
         name: user.created.queue
-        routing-key: user.created
+        routing-key: user.created.chef
         dlq-name: user.created.queue.dlq
         dlq-routing-key: user.created.dlq
       order-created:
