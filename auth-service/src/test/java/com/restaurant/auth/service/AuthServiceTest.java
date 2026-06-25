@@ -114,10 +114,12 @@ class AuthServiceTest {
 
         given(userRepository.findByEmail("john@example.com")).willReturn(Optional.of(savedUser));
         given(jwtService.generateToken(savedUser)).willReturn("jwt-token");
+        given(jwtService.generateRefreshToken(savedUser)).willReturn("refresh-token");
 
         AuthResponse response = authService.login(request);
 
         assertThat(response.token()).isEqualTo("jwt-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
         verify(authenticationManager).authenticate(
                 new UsernamePasswordAuthenticationToken("john@example.com", "password123"));
     }

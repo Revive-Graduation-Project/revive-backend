@@ -26,6 +26,9 @@ public class JwtService {
     @Value("${app.jwt.expiration-ms}")
     private long expirationMs;
 
+    @Value("${app.jwt.refresh-expiration-ms}")
+    private long refreshExpirationMs;
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
@@ -36,7 +39,14 @@ public class JwtService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
         extraClaims.put("role", user.getRole().name());
-        return buildToken(extraClaims, new SecurityUser(user));
+        return buildToken(extraClaims, new SecurityUser(user), expirationMs);
+    }
+
+    /**
+     * Generates a signed JWT refresh token for the given user.
+     */
+    public String generateRefreshToken(User user) {
+        return buildToken(new HashMap<>(), new SecurityUser(user), refreshExpirationMs);
     }
 
     /**
@@ -59,12 +69,12 @@ public class JwtService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
     }
