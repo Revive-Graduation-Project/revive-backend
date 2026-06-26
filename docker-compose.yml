@@ -229,6 +229,9 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: guest
       RABBITMQ_PASSWORD: guest
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_PROFILE_BUCKET: ${SUPABASE_PROFILE_BUCKET:-profile-photos-dev}
     depends_on:
       client-db:
         condition: service_healthy
@@ -275,6 +278,9 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: guest
       RABBITMQ_PASSWORD: guest
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_MEAL_BUCKET: ${SUPABASE_MEAL_BUCKET:-meal-photos-dev}
     depends_on:
       menu-db:
         condition: service_healthy

@@ -10,6 +10,11 @@ spring:
   application:
     name: client-service
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -21,6 +26,11 @@ spring:
 
 server:
   port: 8082
+
+supabase:
+  url: ${SUPABASE_URL:}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+  bucket: ${SUPABASE_PROFILE_BUCKET:profile-photos}
 
 springdoc:
   api-docs:

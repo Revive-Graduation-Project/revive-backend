@@ -13,4 +13,6 @@ public interface MealRepository extends JpaRepository<Meal, Long> {
     Optional<Meal> findByName(String name);
 
     List<Meal> findByHasDiscount(Boolean hasDiscount);
+    
+    List<Meal> findByIsActive(Boolean isActive);
 }

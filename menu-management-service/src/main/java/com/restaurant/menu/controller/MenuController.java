@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Set;
@@ -82,6 +84,40 @@ public class MenuController {
         }
         mealService.deleteMeal(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadMealImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role)) {
+            return forbidden(role);
+        }
+        String imageUrl = mealService.uploadMealImage(id, file);
+        return ResponseEntity.ok(java.util.Map.of("imageUrl", imageUrl));
+    }
+
+    @DeleteMapping("/{id}/image")
+    public ResponseEntity<?> deleteMealImage(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role)) {
+            return forbidden(role);
+        }
+        mealService.deleteMealImage(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping(value = "/bulk-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadBulkMealImages(
+            @RequestParam("files") MultipartFile[] files,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role)) {
+            return forbidden(role);
+        }
+        List<String> imageUrls = mealService.uploadBulkMealImages(files);
+        return ResponseEntity.ok(java.util.Map.of("uploadedCount", imageUrls.size(), "urls", imageUrls));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

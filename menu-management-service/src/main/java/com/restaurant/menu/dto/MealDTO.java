@@ -31,6 +31,8 @@ public record MealDTO(
 
         Double discountPercentage,
 
+        String imageUrl,
+
         @Valid
         List<MealIngredientDTO> mealIngredients) {
 }

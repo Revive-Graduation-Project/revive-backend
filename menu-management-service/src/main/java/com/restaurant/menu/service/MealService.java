@@ -4,6 +4,7 @@ import com.restaurant.menu.dto.DiscountRequest;
 import com.restaurant.menu.dto.MealDTO;
 import com.restaurant.menu.dto.MealRequest;
 import com.restaurant.menu.event.MenuNutritionEvent;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -59,4 +60,19 @@ public interface MealService {
      * If hasDiscount is null, returns all meals.
      */
     List<MealDTO> getMealsByDiscount(Boolean hasDiscount);
+
+    /**
+     * Uploads an image for a meal and returns the public URL.
+     */
+    String uploadMealImage(Long id, MultipartFile file);
+
+    /**
+     * Uploads multiple images for meals, using filename convention (e.g. 5.jpg) for IDs.
+     */
+    List<String> uploadBulkMealImages(MultipartFile[] files);
+
+    /**
+     * Deletes the image for a meal.
+     */
+    void deleteMealImage(Long id);
 }

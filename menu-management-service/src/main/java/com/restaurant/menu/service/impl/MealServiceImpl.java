@@ -16,10 +16,12 @@ import com.restaurant.menu.repository.IngredientRepository;
 import com.restaurant.menu.repository.MealRepository;
 import com.restaurant.menu.service.IngredientService;
 import com.restaurant.menu.service.MealService;
+import com.restaurant.menu.service.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +37,7 @@ public class MealServiceImpl implements MealService {
     private final IngredientService ingredientService;
     private final IngredientRepository ingredientRepository;
     private final MealMapper mealMapper;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Override
     @Transactional
@@ -49,7 +52,7 @@ public class MealServiceImpl implements MealService {
                     .orElseGet(() -> Meal.builder()
                             .name(mealNutrition.mealName())
                             .description(mealNutrition.description())
-                            .isActive(true)
+                            .isActive(false) // newly imported meals are inactive until a photo is uploaded
                             .build());
 
             meal.setCategory(mealNutrition.category());
@@ -138,7 +141,7 @@ public class MealServiceImpl implements MealService {
                 .description(request.description())
                 .price(request.price())
                 .category(request.category())
-                .isActive(true)
+                .isActive(false) // inactive until photo is attached
                 .build();
 
         return processMealIngredients(meal, request.ingredients());
@@ -196,6 +199,75 @@ public class MealServiceImpl implements MealService {
             return mealMapper.toDTOList(mealRepository.findAll());
         }
         return mealMapper.toDTOList(mealRepository.findByHasDiscount(hasDiscount));
+    }
+
+    @Override
+    @Transactional
+    public String uploadMealImage(Long id, MultipartFile file) {
+        log.info("Uploading image for meal: {}", id);
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new MealNotFoundException(id));
+
+        // If there's an existing image, delete it from storage first
+        if (meal.getImageUrl() != null) {
+            supabaseStorageService.deleteImage(meal.getImageUrl());
+        }
+
+        String publicUrl = supabaseStorageService.uploadImage(file);
+        meal.setImageUrl(publicUrl);
+        meal.setIsActive(true); // active once photo is uploaded
+        mealRepository.save(meal);
+
+        return publicUrl;
+    }
+
+    @Override
+    @Transactional
+    public void deleteMealImage(Long id) {
+        log.info("Deleting image for meal: {}", id);
+        Meal meal = mealRepository.findById(id)
+                .orElseThrow(() -> new MealNotFoundException(id));
+
+        if (meal.getImageUrl() != null) {
+            supabaseStorageService.deleteImage(meal.getImageUrl());
+            meal.setImageUrl(null);
+            meal.setIsActive(false); // inactive when photo is deleted
+            mealRepository.save(meal);
+        }
+    }
+
+    @Override
+    @Transactional
+    public List<String> uploadBulkMealImages(MultipartFile[] files) {
+        log.info("Bulk uploading {} meal images", files.length);
+        List<String> uploadedUrls = new ArrayList<>();
+        
+        for (MultipartFile file : files) {
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || !originalFilename.contains(".")) continue;
+            
+            try {
+                String idStr = originalFilename.substring(0, originalFilename.lastIndexOf("."));
+                Long mealId = Long.parseLong(idStr);
+                
+                Meal meal = mealRepository.findById(mealId).orElse(null);
+                if (meal != null) {
+                    if (meal.getImageUrl() != null) {
+                        supabaseStorageService.deleteImage(meal.getImageUrl());
+                    }
+                    String publicUrl = supabaseStorageService.uploadImage(file);
+                    meal.setImageUrl(publicUrl);
+                    meal.setIsActive(true);
+                    mealRepository.save(meal);
+                    uploadedUrls.add(publicUrl);
+                } else {
+                    log.warn("Meal ID {} not found for bulk upload file {}", mealId, originalFilename);
+                }
+            } catch (NumberFormatException e) {
+                log.warn("Invalid filename format for bulk upload: {}. Expected meal_id.ext", originalFilename);
+            }
+        }
+        return uploadedUrls;
     }
 
     private MealDTO processMealIngredients(Meal meal, List<MealRequest.IngredientQuantity> ingredientRequests) {

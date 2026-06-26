@@ -62,6 +62,9 @@ public class Meal {
     @ColumnDefault("0.0")
     private Double discountPercentage = 0.0;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MealIngredient> mealIngredients;
 
