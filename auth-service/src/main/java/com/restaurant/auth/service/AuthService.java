@@ -164,7 +164,13 @@ public class AuthService {
                                                 "User authenticated but not found — this should never happen"));
 
                 log.info("User logged in: id={}", user.getId());
-                return new AuthResponse(jwtService.generateToken(user), user.getRole().name(), user.getId(),
-                                user.getEmail(), user.getFirstName(), user.getLastName());
+                return new AuthResponse(
+                                jwtService.generateToken(user),
+                                jwtService.generateRefreshToken(user),
+                                user.getRole().name(),
+                                user.getId(),
+                                user.getEmail(),
+                                user.getFirstName(),
+                                user.getLastName());
         }
 }

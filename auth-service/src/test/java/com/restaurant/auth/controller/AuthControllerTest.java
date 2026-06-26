@@ -136,7 +136,7 @@ class AuthControllerTest {
         @DisplayName("POST /auth/login returns 200 and a token for valid credentials")
         void login_validRequest_returns200() throws Exception {
                 AuthRequest request = new AuthRequest("johndoe@example.com", "secret123");
-                AuthResponse response = new AuthResponse("jwt-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
+                AuthResponse response = new AuthResponse("jwt-token-xyz", "refresh-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
 
                 given(authService.login(request)).willReturn(response);
 
