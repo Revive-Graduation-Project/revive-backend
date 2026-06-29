@@ -26,6 +26,7 @@ public interface OrderMapper {
                 order.getDiscount(),
                 order.getCreatedAt(),
                 order.getStripeClientSecret(),
+                order.getStripePaymentIntentId(),
                 toItemResponseList(order.getItems())
         );
     }

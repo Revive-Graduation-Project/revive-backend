@@ -1,6 +1,7 @@
 package com.restaurant.order.entity;
 
 import com.restaurant.order.enums.OrderStatus;
+import com.restaurant.order.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -52,6 +53,10 @@ public class Order {
 
     @Column(name = "stripe_client_secret")
     private String stripeClientSecret;
+
+    @Column(name = "payment_method" , nullable = false)
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
 
     @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)

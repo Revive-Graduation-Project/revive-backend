@@ -11,6 +11,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -107,6 +108,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidFormat(HttpMessageNotReadableException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("Invalid value provided", Instant.now()));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
+
+        ErrorResponse error = new ErrorResponse(
+                ex.getReason() ,
+                Instant.now()
+        );
+
+        return ResponseEntity.status(ex.getStatusCode()).body(error);
     }
 
     // fallback — anything unexpected

@@ -7,6 +7,7 @@ import com.restaurant.order.events.points.PointRedemptionSucceededEvent;
 import com.restaurant.order.events.tickets.TicketCreatedEvent;
 import com.restaurant.order.events.tickets.TicketCreationFailedEvent;
 import com.restaurant.order.events.tickets.TicketReadyEvent;
+import com.restaurant.order.events.tickets.TicketStartedEvent;
 import com.restaurant.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,12 @@ public class MessageListener {
     public void onTicketReady(TicketReadyEvent event) {
         log.info("Received ticket.ready event for orderId: {}", event.getId());
         orderService.onTicketReady(event.getId());
+    }
+
+    @RabbitListener(queues = "${app.rabbitmq.queues.ticket-started.name}")
+    public void onTicketStarted(TicketStartedEvent event) {
+        log.info("Received ticket.started event for orderId: {}, ticketId: {}", event.getId(), event.getTicketId());
+        orderService.onTicketStarted(event.getId(), event.getTicketId());
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queues.payment-succeeded.name}")

@@ -9,6 +9,7 @@ import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.enums.OrderStatus;
+import com.restaurant.order.enums.PaymentMethod;
 import com.restaurant.order.events.OrderCreatedEvent;
 import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
@@ -22,14 +23,18 @@ import com.restaurant.order.messaging.MessagePublisher;
 import com.restaurant.order.repository.OrderRepository;
 import com.restaurant.order.service.OrderCalculator;
 import com.restaurant.order.service.OrderService;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -50,7 +55,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 1. Validate points
         int pointsToRedeem = request.points() != null ? request.points() : 0;
-        int discount = switch (pointsToRedeem){
+        int discount = switch (pointsToRedeem) {
             case 0 -> 0;
             case 100 -> 10;
             case 200 -> 20;
@@ -63,6 +68,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = Order.builder()
                 .clientId(clientId)
                 .discount(discount)
+                .paymentMethod(request.paymentMethod())
                 .build();
 
         // 2. Fetch price snapshots from menu-service and build items
@@ -84,7 +90,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Reserving stock for order...");
         try {
             menuClient.reserveStock(request.items());
-        } catch (Exception e){
+        } catch (Exception e) {
             log.error("Failed to reserve stock for order.", e);
             throw new MenuServiceException("Cannot reserve stock for order. The stock may be insufficient");
         }
@@ -99,9 +105,15 @@ public class OrderServiceImpl implements OrderService {
                 log.info("Triggering async point redemption for {} points...", pointsToRedeem);
                 publishPointRedemptionRequestedEvent(savedOrder);
             } else {
-                savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
+                // Check payment method - only call payment service for non-cash payments
+                if (!request.paymentMethod().equals(PaymentMethod.CASH)) {
+                    savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
+                    createPaymentIntentSync(savedOrder);
+                } else {
+                    log.info("Payment method is CASH for order {}, skipping payment service call", savedOrder.getId());
+                    publishOrderCreatedEvent(savedOrder);
+                }
                 orderRepository.save(savedOrder);
-                createPaymentIntentSync(savedOrder);
             }
 
             return orderMapper.toResponse(savedOrder);
@@ -131,7 +143,7 @@ public class OrderServiceImpl implements OrderService {
                         log.info("Order {} status updated to CONFIRMED (ticket {})", orderId, ticketId);
 
                         // Reward points: 1 point per 5 EGP spent
-                        if(order.getDiscount() == 0) {
+                        if (order.getDiscount() == 0) {
                             int pointsToReward = order.getTotalPrice().intValue() / 5;
                             if (pointsToReward > 0) {
                                 messagePublisher.publishRewardPointsEarned(
@@ -185,7 +197,6 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-
     @Transactional
     @Override
     public void markPointRedemptionSucceeded(Long orderId) {
@@ -202,10 +213,16 @@ public class OrderServiceImpl implements OrderService {
                             return;
                         }
 
-                        order.setStatus(OrderStatus.AWAITING_PAYMENT);
-                        orderRepository.save(order);
-                        log.info("Point redemption succeeded for order {}. Proceeding to payment...", orderId);
-                        createPaymentIntentSync(order);
+                        // Check payment method - only call payment service for non-cash payments
+                        if (!order.getPaymentMethod().equals(PaymentMethod.CASH)) {
+                            order.setStatus(OrderStatus.AWAITING_PAYMENT);
+                            orderRepository.save(order);
+                            log.info("Point redemption succeeded for order {}. Proceeding to payment...", orderId);
+                            createPaymentIntentSync(order);
+                        } else {
+                            log.info("Payment method is CASH for order {}, skipping payment service call and publishing order created", orderId);
+                            publishOrderCreatedEvent(order);
+                        }
                     } catch (Exception e) {
                         log.error("MANUAL INTERVENTION REQUIRED: Failed to process point redemption success for order {}. Error: {}", orderId, e.getMessage());
                         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
@@ -231,46 +248,65 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public void cancelOrder(Long orderId, String reason) {
+    public void cancelOrder(Long orderId, @Nullable String reason) {
         orderRepository.findById(orderId).ifPresentOrElse(
                 order -> {
                     try {
-                        if (order.getStatus() == OrderStatus.CANCELLED) {
+                        OrderStatus status = order.getStatus();
+
+                        // 0. Short-circuit if already canceled
+                        if (status == OrderStatus.CANCELED) {
                             log.info("Order {} already cancelled, skipping.", orderId);
                             return;
                         }
 
-                        // 1. Rollback Stock (Always if not already cancelled and stock was reserved)
-                        if (order.getStatus() != OrderStatus.READY_FOR_PICKUP) {
-                            try {
-                                log.info("Rolling back stock for cancelled order {}", orderId);
-                                menuClient.rollbackStock(buildItemRequests(order));
-                            } catch (Exception e) {
-                                log.error("Failed to rollback stock for cancelled order {}", orderId, e);
-                            }
+                        // 1. Refuse Cancellation Check
+                        boolean isAdvancedStage = (status == OrderStatus.PREPARING || status == OrderStatus.READY);
+                        boolean isPaidOrConfirmed = (status == OrderStatus.PAID || status == OrderStatus.CONFIRMED);
+                        boolean isNotCash = !PaymentMethod.CASH.equals(order.getPaymentMethod());
+
+                        if (isAdvancedStage) {
+                            log.warn("Cancellation refused for order {}. Status is {} ", orderId, status);
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot cancel order that is already started preparing");
                         }
 
-                        // 2. Refund Payment if order was PAID or beyond
-                        if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
+                        // 2. Rollback Stock
+                        try {
+                            log.info("Rolling back stock for cancelled order {}", orderId);
+                            menuClient.rollbackStock(buildItemRequests(order));
+                        } catch (Exception e) {
+                            log.error("Failed to rollback stock for cancelled order {}", orderId, e);
+                        }
+
+                        // 3. Refund Payment if order was paid or confirmed (but passes cancellation check)
+                        if (isPaidOrConfirmed && isNotCash) {
                             log.info("Triggering payment refund for order {}", orderId);
                             publishPaymentRefundEvent(order);
                         }
 
-                        // 3. Rollback Points if they were successfully redeemed
-                        if (order.getDiscount() != 0 && order.getStatus() != OrderStatus.PENDING) {
+                        // 4. Rollback Points (Refund points if discount exists and order is NOT pending)
+                        if (order.getDiscount() != 0 && status != OrderStatus.PENDING) {
                             log.info("Triggering point redemption rollback for order {}", orderId);
                             publishPointRedemptionRollbackEvent(order);
                         }
 
-                        order.setStatus(OrderStatus.CANCELLED);
+                        // 5. Finalize Cancellation State
+                        order.setStatus(OrderStatus.CANCELED);
                         orderRepository.save(order);
-                        log.info("Order {} cancelled. Reason: {}", orderId, reason);
+                        log.info("Order {} cancelled. Reason: {}", orderId, reason != null ? reason : "Client Cancellation Request");
+
+                    } catch (ResponseStatusException e) {
+                        // Pass through client errors cleanly without marking transaction for forced system rollback
+                        throw e;
                     } catch (Exception e) {
                         log.error("MANUAL INTERVENTION REQUIRED: Failed to cancel order {}. Error: {}", orderId, e.getMessage());
                         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
                     }
                 },
-                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for cancellation, orderId: {}", orderId)
+                () -> {
+                    log.error("MANUAL INTERVENTION REQUIRED: Order not found for cancellation, orderId: {}", orderId);
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
+                }
         );
     }
 
@@ -280,11 +316,11 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.findById(orderId).ifPresentOrElse(
                 order -> {
                     try {
-                        if (order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
-                            log.info("Order {} already marked as READY_FOR_PICKUP, skipping.", orderId);
+                        if (order.getStatus() == OrderStatus.READY) {
+                            log.info("Order {} already marked as READY, skipping.", orderId);
                             return;
                         }
-                        order.setStatus(OrderStatus.READY_FOR_PICKUP);
+                        order.setStatus(OrderStatus.READY);
                         orderRepository.save(order);
                     } catch (Exception e) {
                         log.error("MANUAL INTERVENTION REQUIRED: Failed to mark order {} as ready. Error: {}", orderId, e.getMessage());
@@ -292,6 +328,28 @@ public class OrderServiceImpl implements OrderService {
                     }
                 },
                 () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for ticket ready status, ID: {}", orderId)
+        );
+    }
+
+    @Transactional
+    @Override
+    public void onTicketStarted(Long orderId, Long ticketId) {
+        orderRepository.findById(orderId).ifPresentOrElse(
+                order -> {
+                    try {
+                        if (order.getStatus() == OrderStatus.PREPARING) {
+                            log.info("Order {} already marked as PREPARING, skipping.", orderId);
+                            return;
+                        }
+                        order.setStatus(OrderStatus.PREPARING);
+                        orderRepository.save(order);
+                        log.info("Order {} status updated to PREPARING (ticket {})", orderId, ticketId);
+                    } catch (Exception e) {
+                        log.error("MANUAL INTERVENTION REQUIRED: Failed to mark order {} as preparing. Error: {}", orderId, e.getMessage());
+                        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+                    }
+                },
+                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for ticket started status, ID: {}", orderId)
         );
     }
 
@@ -359,5 +417,13 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             log.error("CRITICAL: Failed to publish payment.refund event for orderId: {}", order.getId(), e);
         }
+    }
+
+    @Override
+    public List<OrderResponse> getClientOrderHistory(Long clientId) {
+        List<Order> orders = orderRepository.findByClientIdOrderByCreatedAtDesc(clientId);
+        return orders.stream()
+                .map(orderMapper::toResponse)
+                .collect(Collectors.toList());
     }
 }

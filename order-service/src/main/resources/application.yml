@@ -75,6 +75,9 @@ app:
       point-redemption-failed:
         name: point.redemption.failed.queue
         routing-key: point-redemption.failed
+      ticket-started:
+        name: ticket.started.queue
+        routing-key: ticket.started
 
   services:
     menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
