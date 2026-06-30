@@ -2,9 +2,7 @@ package com.restaurant.kitchen.messaging;
 
 import com.restaurant.kitchen.events.chefProfileEvents.ProfileCreatedEvent;
 import com.restaurant.kitchen.events.chefProfileEvents.ProfileCreationFailedEvent;
-import com.restaurant.kitchen.events.ticketEvents.TicketCreatedEvent;
-import com.restaurant.kitchen.events.ticketEvents.TicketCreationFailedEvent;
-import com.restaurant.kitchen.events.ticketEvents.TicketReadyEvent;
+import com.restaurant.kitchen.events.ticketEvents.*;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +42,20 @@ public class MessagePublisher {
     public void publishTicketReady(TicketReadyEvent event, String correlationId) {
         send("ticket.ready", event, null, correlationId); // simple point-to-point communication no saga needed
         log.info("Ticket ready event published for order {} . ticket id: {}", event.getId() , event.getTicketId());
+    }
+
+    public void publishTicketStarted(TicketStartedEvent event, String correlationId) {
+        send("ticket.started", event, null, correlationId); // simple point-to-point communication no saga needed
+        log.info("Ticket started event published for order {} . ticket id: {}", event.getId() , event.getTicketId());
+    }
+
+    public void publishTicketCanceled(TicketCanceledEvent event, String correlationId) {
+        send("ticket.canceled", event, null, correlationId); // simple point-to-point communication no saga needed
+        log.info("Ticket canceled event published for order {} . ticket id: {}", event.getId() , event.getTicketId());
+    }
+    public void publishTicketCanceledFailed(TicketCanceledFailedEvent event, String sagaId, String correlationId) {
+        send("ticket.canceled.failed", event, sagaId, correlationId);
+        log.info("Ticket canceled failed event published for order {}", event.getId());
     }
 
     private void send(String routingKey, Object payload, @Nullable String sagaId, String correlationId) {

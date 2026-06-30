@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TicketCanceledFailedEvent {
-    private Long id; //orderId
-    private String message;
+public class TicketStartedEvent {
+    private Long id; // orderId
+    private Long ticketId;
 }
