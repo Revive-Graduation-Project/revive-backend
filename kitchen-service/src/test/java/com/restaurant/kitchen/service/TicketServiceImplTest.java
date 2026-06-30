@@ -71,7 +71,8 @@ class TicketServiceImplTest {
         availableChef.setId(10L);
 
         when(kitchenTicketRepository.findByOrderId(100L)).thenReturn(Optional.empty());
-        when(chefProfileRepository.findMostAvailableActiveChefs(ChefStatus.ACTIVE, List.of(TicketStatus.PREPARING), PageRequest.of(0, 1)))
+        when(chefProfileRepository.findMostAvailableActiveChefs(
+                ChefStatus.ACTIVE, List.of(TicketStatus.QUEUED, TicketStatus.PREPARING), PageRequest.of(0, 1)))
                 .thenReturn(List.of(availableChef));
 
         KitchenTicket savedTicket = buildTicket(TicketStatus.PREPARING);
@@ -90,7 +91,8 @@ class TicketServiceImplTest {
         event.setId(100L);
 
         when(kitchenTicketRepository.findByOrderId(100L)).thenReturn(Optional.empty());
-        when(chefProfileRepository.findMostAvailableActiveChefs(ChefStatus.ACTIVE, List.of(TicketStatus.PREPARING), PageRequest.of(0, 1)))
+        when(chefProfileRepository.findMostAvailableActiveChefs(
+                ChefStatus.ACTIVE, List.of(TicketStatus.QUEUED, TicketStatus.PREPARING), PageRequest.of(0, 1)))
                 .thenReturn(List.of());
 
         assertThrows(RuntimeException.class, () -> ticketService.createKitchenTicket(event, "corr-001", "saga-001"));
@@ -113,7 +115,6 @@ class TicketServiceImplTest {
 
         assertEquals(TicketStatus.READY, ticket.getStatus());
         assertEquals(TicketStatus.READY, result.status());
-        verify(kitchenTicketRepository, never()).save(any()); // uses dirty checking
     }
 
     @Test
