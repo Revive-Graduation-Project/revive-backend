@@ -5,7 +5,7 @@ import com.restaurant.auth.config.SecurityUser;
 import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;
-import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.dto.StaffSignupRequest;
@@ -24,6 +24,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -170,7 +176,7 @@ public class AuthService {
 
         // ── Login ─────────────────────────────────────────────────────────────────
 
-        public AuthResponse login(AuthRequest request) {
+        public AuthTokenPair login(AuthRequest request) {
                 // Delegates credential validation to DaoAuthenticationProvider.
                 // The first argument is the email — Spring's internal parameter is named
                 // "username" but here it holds the email value as the principal identifier.
@@ -182,10 +188,20 @@ public class AuthService {
                                 .orElseThrow(() -> new IllegalStateException(
                                                 "User authenticated but not found — this should never happen"));
 
+                if (!Boolean.TRUE.equals(user.getIsActive())) {
+                        throw new IllegalArgumentException("User is inactive");
+                }
+
+                String refreshTokenFamily = UUID.randomUUID().toString();
+                String refreshToken = jwtService.generateRefreshToken(user, refreshTokenFamily);
+                user.setRefreshTokenFamily(refreshTokenFamily);
+                user.setRefreshTokenHash(hashToken(refreshToken));
+                userRepository.save(user);
+
                 log.info("User logged in: id={}", user.getId());
-                return new AuthResponse(
+                return new AuthTokenPair(
                                 jwtService.generateToken(user),
-                                jwtService.generateRefreshToken(user),
+                                refreshToken,
                                 user.getRole().name(),
                                 user.getId(),
                                 user.getEmail(),
@@ -193,7 +209,8 @@ public class AuthService {
                                 user.getLastName());
         }
 
-    public AuthResponse refreshToken(String refreshToken) {
+    @Transactional
+    public AuthTokenPair refreshToken(String refreshToken) {
         String email;
 
         try {
@@ -205,17 +222,41 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
 
-        if (!jwtService.isTokenValid(refreshToken, new SecurityUser(user))) {
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new IllegalArgumentException("User is inactive");
+        }
+
+        if (!jwtService.isRefreshTokenValid(refreshToken, user)) {
             throw new IllegalArgumentException("Invalid refresh token");
         }
 
-        return new AuthResponse(
+        if (!hashToken(refreshToken).equals(user.getRefreshTokenHash())) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
+
+        String refreshTokenFamily = UUID.randomUUID().toString();
+        String rotatedRefreshToken = jwtService.generateRefreshToken(user, refreshTokenFamily);
+        user.setRefreshTokenFamily(refreshTokenFamily);
+        user.setRefreshTokenHash(hashToken(rotatedRefreshToken));
+        userRepository.save(user);
+
+        return new AuthTokenPair(
                 jwtService.generateToken(user),
-                jwtService.generateRefreshToken(user),
+                rotatedRefreshToken,
                 user.getRole().name(),
                 user.getId(),
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName());
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("Unable to hash refresh token", ex);
+        }
     }
 }

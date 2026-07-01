@@ -2,7 +2,7 @@ package com.restaurant.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurant.auth.dto.AuthRequest;
-import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.exception.GlobalExceptionHandler;
@@ -137,7 +137,7 @@ class AuthControllerTest {
         @DisplayName("POST /auth/login returns 200 and a token for valid credentials")
         void login_validRequest_returns200() throws Exception {
                 AuthRequest request = new AuthRequest("johndoe@example.com", "secret123");
-                AuthResponse response = new AuthResponse("jwt-token-xyz", "refresh-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
+                AuthTokenPair response = new AuthTokenPair("jwt-token-xyz", "refresh-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
 
                 given(authService.login(request)).willReturn(response);
 
@@ -151,7 +151,7 @@ class AuthControllerTest {
         @Test
         @DisplayName("POST /auth/refresh returns 200 and a refreshed token for valid refresh token")
         void refresh_validRequest_returns200() throws Exception {
-                AuthResponse response = new AuthResponse("new-jwt-token", "new-refresh-token", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
+                AuthTokenPair response = new AuthTokenPair("new-jwt-token", "new-refresh-token", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
 
                 given(authService.refreshToken("refresh-token-xyz")).willReturn(response);
 
@@ -160,7 +160,7 @@ class AuthControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("refreshToken=new-refresh-token")))
                                 .andExpect(jsonPath("$.token").value("new-jwt-token"))
-                                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
+                                .andExpect(jsonPath("$.refreshToken").doesNotExist());
         }
 
         @Test

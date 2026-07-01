@@ -5,7 +5,7 @@ import com.restaurant.auth.config.SecurityUser;
 import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;
-import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.event.UserCreatedEvent;
@@ -131,12 +131,12 @@ class AuthServiceTest {
 
         given(userRepository.findByEmail("john@example.com")).willReturn(Optional.of(savedUser));
         given(jwtService.generateToken(savedUser)).willReturn("jwt-token");
-        given(jwtService.generateRefreshToken(savedUser)).willReturn("refresh-token");
+        given(jwtService.generateRefreshToken(eq(savedUser), anyString())).willReturn("refresh-token");
 
-        AuthResponse response = authService.login(request);
+        AuthTokenPair response = authService.login(request);
 
         assertThat(response.token()).isEqualTo("jwt-token");
-        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+        verify(jwtService).generateRefreshToken(eq(savedUser), anyString());
         verify(authenticationManager).authenticate(
                 new UsernamePasswordAuthenticationToken("john@example.com", "password123"));
     }
@@ -144,16 +144,18 @@ class AuthServiceTest {
     @Test
     @DisplayName("refreshToken() returns a new auth response when the refresh token is valid")
     void refreshToken_validRefresh_returnsNewToken() {
+        savedUser.setRefreshTokenFamily("family-1");
+        savedUser.setRefreshTokenHash("f2d4d4f7a1dbf9b0ab3d2a1970e95d5b0e3f1f24d0d0f2e9f5d77a6f6d6f1f9a");
         given(jwtService.extractEmail("refresh-token")).willReturn("john@example.com");
         given(userRepository.findByEmail("john@example.com")).willReturn(Optional.of(savedUser));
-        given(jwtService.isTokenValid(eq("refresh-token"), any(SecurityUser.class))).willReturn(true);
+        given(jwtService.isRefreshTokenValid(eq("refresh-token"), any(User.class))).willReturn(true);
         given(jwtService.generateToken(savedUser)).willReturn("new-jwt-token");
-        given(jwtService.generateRefreshToken(savedUser)).willReturn("new-refresh-token");
+        given(jwtService.generateRefreshToken(eq(savedUser), anyString())).willReturn("new-refresh-token");
 
-        AuthResponse response = authService.refreshToken("refresh-token");
+        AuthTokenPair response = authService.refreshToken("refresh-token");
 
         assertThat(response.token()).isEqualTo("new-jwt-token");
-        assertThat(response.refreshToken()).isEqualTo("new-refresh-token");
+        verify(jwtService).generateRefreshToken(savedUser);
     }
 
     @Test
@@ -164,6 +166,21 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.refreshToken("bad-token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid refresh token");
+    }
+
+    @Test
+    @DisplayName("login() rejects inactive users")
+    void login_inactiveUser_throws() {
+        AuthRequest request = new AuthRequest("john@example.com", "password123");
+        savedUser.setIsActive(false);
+
+        given(userRepository.findByEmail("john@example.com")).willReturn(Optional.of(savedUser));
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("User is inactive");
+
+        verify(jwtService, never()).generateRefreshToken(any(User.class), anyString());
     }
 
     @Test

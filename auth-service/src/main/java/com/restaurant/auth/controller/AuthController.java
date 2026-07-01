@@ -2,6 +2,7 @@ package com.restaurant.auth.controller;
 
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.dto.StaffSignupRequest;
@@ -49,10 +50,10 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
-        AuthResponse response = authService.login(request);
+        AuthTokenPair tokenPair = authService.login(request);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(response.refreshToken()).toString())
-                .body(response);
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(tokenPair.refreshToken()).toString())
+                .body(toPublicResponse(tokenPair));
     }
 
     @PostMapping("/refresh")
@@ -61,10 +62,20 @@ public class AuthController {
             throw new IllegalArgumentException("Refresh token is missing");
         }
 
-        AuthResponse response = authService.refreshToken(refreshToken);
+        AuthTokenPair tokenPair = authService.refreshToken(refreshToken);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(response.refreshToken()).toString())
-                .body(response);
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(tokenPair.refreshToken()).toString())
+                .body(toPublicResponse(tokenPair));
+    }
+
+    private AuthResponse toPublicResponse(AuthTokenPair tokenPair) {
+        return new AuthResponse(
+                tokenPair.token(),
+                tokenPair.role(),
+                tokenPair.userId(),
+                tokenPair.emailString(),
+                tokenPair.firstName(),
+                tokenPair.lastName());
     }
 
     private ResponseCookie buildRefreshCookie(String refreshToken) {
