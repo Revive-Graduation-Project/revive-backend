@@ -82,7 +82,7 @@ public class AuthController {
         return ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("Strict")
+                .sameSite("None")
                 .path("/")
                 .maxAge(jwtService.getRefreshExpirationSeconds())
                 .build();
