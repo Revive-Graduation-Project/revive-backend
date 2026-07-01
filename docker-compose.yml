@@ -153,7 +153,7 @@ services:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # AMQP
+      - "5672:5672" # AMQP
       - "15672:15672" # Management UI
     environment:
       RABBITMQ_DEFAULT_USER: guest
@@ -167,23 +167,46 @@ services:
       retries: 5
 
   # ─────────────────────────────────────────────
-  # Spring Boot Microservices
+  # API Gateway (ONLY exposed port to the outside)
+  # ─────────────────────────────────────────────
+  gateway-service:
+    build:
+      context: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080" # the ONLY port exposed to the host
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    depends_on:
+      - auth-service
+      - client-service
+      - inventory-service
+      - menu-management-service
+      - order-service
+      - kitchen-service
+    networks:
+      - restaurant-net
+
+  # ─────────────────────────────────────────────
+  # Spring Boot Microservices (internal only)
+  # All services use SPRING_PROFILES_ACTIVE=dev (set in Dockerfile)
+  # which configures container hostnames for DB and RabbitMQ.
   # ─────────────────────────────────────────────
   auth-service:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
     container_name: auth-service
-    ports:
-      - "8081:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://auth-db:5432/auth_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
+      AUTH_DB_URL: jdbc:postgresql://auth-db:5432/auth_db
+      AUTH_DB_USERNAME: postgres
+      AUTH_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     depends_on:
       auth-db:
         condition: service_healthy
@@ -197,12 +220,18 @@ services:
       context: .
       dockerfile: client-service/Dockerfile
     container_name: client-service
-    ports:
-      - "8082:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://client-db:5432/client_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      CLIENT_DB_URL: jdbc:postgresql://client-db:5432/client_db
+      CLIENT_DB_USERNAME: postgres
+      CLIENT_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_PROFILE_BUCKET: ${SUPABASE_PROFILE_BUCKET:-profile-photos-dev}
     depends_on:
       client-db:
         condition: service_healthy
@@ -214,12 +243,21 @@ services:
       context: .
       dockerfile: inventory-service/Dockerfile
     container_name: inventory-service
-    ports:
-      - "8083:8080"
+    # no ports: — only reachable via gateway on Docker network
+    env_file:
+      - inventory-service/.env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-db:5432/inventory_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      INVENTORY_DB_URL: jdbc:postgresql://inventory-db:5432/inventory_db
+      INVENTORY_DB_USERNAME: postgres
+      INVENTORY_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      USDA_API_KEY: ${USDA_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -231,12 +269,18 @@ services:
       context: .
       dockerfile: menu-management-service/Dockerfile
     container_name: menu-management-service
-    ports:
-      - "8084:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://menu-db:5432/menu_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      MENU_DB_URL: jdbc:postgresql://menu-db:5432/menu_db
+      MENU_DB_USERNAME: postgres
+      MENU_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_MEAL_BUCKET: ${SUPABASE_MEAL_BUCKET:-meal-photos-dev}
     depends_on:
       menu-db:
         condition: service_healthy
@@ -248,12 +292,15 @@ services:
       context: .
       dockerfile: order-service/Dockerfile
     container_name: order-service
-    ports:
-      - "8085:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://order-db:5432/order_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      ORDER_DB_URL: jdbc:postgresql://order-db:5432/order_db
+      ORDER_DB_USERNAME: postgres
+      ORDER_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
     depends_on:
       order-db:
         condition: service_healthy
@@ -265,12 +312,16 @@ services:
       context: .
       dockerfile: kitchen-service/Dockerfile
     container_name: kitchen-service
-    ports:
-      - "8086:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://kitchen-db:5432/kitchen_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      KITCHEN_DB_URL: jdbc:postgresql://kitchen-db:5432/kitchen_db
+      KITCHEN_DB_USERNAME: postgres
+      KITCHEN_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     depends_on:
       kitchen-db:
         condition: service_healthy
@@ -282,16 +333,15 @@ services:
       context: .
       dockerfile: payment-service/Dockerfile
     container_name: payment-service
-    ports:
-      - "8088:8080"
+    # no ports: — only reachable via gateway on Docker network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://payment-db:5432/payment_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
+      PAYMENT_DB_URL: jdbc:postgresql://payment-db:5432/payment_db
+      PAYMENT_DB_USERNAME: postgres
+      PAYMENT_DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
     depends_on:

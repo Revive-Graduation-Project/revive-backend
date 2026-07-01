@@ -26,5 +26,6 @@ public class ClientProfileDto {
     private Goal goal;
     private Set<HealthCondition> healthConditions;
     private String phoneNumber;
+    private String profilePictureUrl;
     private Integer loyaltyPoints;
 }

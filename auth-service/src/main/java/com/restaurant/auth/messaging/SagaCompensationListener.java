@@ -1,7 +1,6 @@
 package com.restaurant.auth.messaging;
 
 import com.restaurant.auth.event.ProfileCreationFailedEvent;
-import com.restaurant.auth.exception.UserNotFoundException;
 import com.restaurant.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,10 +31,14 @@ public class SagaCompensationListener {
     public void handleProfileCreationFailed(ProfileCreationFailedEvent event) {
         log.warn("Saga compensation triggered for userId={}", event.getId());
 
-        var user = userRepository.findById(event.getId())
-                .orElseThrow(() -> new UserNotFoundException(event.getId()));
+        var userOpt = userRepository.findById(event.getId());
 
-        userRepository.delete(user);
+        if (userOpt.isEmpty()) {
+            log.warn("Saga compensation ignored: User id={} already deleted or not found", event.getId());
+            return;
+        }
+
+        userRepository.delete(userOpt.get());
         log.warn("Hard-deleted user id={} as saga compensation", event.getId());
     }
 }

@@ -12,12 +12,16 @@ import com.restaurant.client.event.UserCreatedEvent;
 import com.restaurant.client.repository.ClientProfileRepository;
 import com.restaurant.client.repository.PointOperationRepository;
 import com.restaurant.client.service.ClientProfileService;
+import com.restaurant.client.service.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,18 +30,16 @@ public class ClientProfileServiceImpl implements ClientProfileService {
 
     private final ClientProfileRepository clientProfileRepository;
     private final PointOperationRepository pointOperationRepository;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Override
     @Transactional
     public void createProfileFromEvent(UserCreatedEvent event) {
-        // Idempotency check: Ensure we don't create duplicate profiles for the same
-        // User ID
         if (clientProfileRepository.existsById(event.getId())) {
             log.info("ClientProfile for user ID: {} already exists. Ignoring duplicate event.", event.getId());
             return;
         }
 
-        // Map the simple string fields back to our Enums safely
         Gender gender = null;
         if (event.getGender() != null && !event.getGender().isBlank()) {
             try {
@@ -79,11 +81,19 @@ public class ClientProfileServiceImpl implements ClientProfileService {
                 .weightUnit(event.getWeightUnit())
                 .goal(goal)
                 .healthConditions(healthConditions)
-                .loyaltyPoints(0) // Default starting points
+                .loyaltyPoints(0)
                 .build();
 
         clientProfileRepository.save(profile);
         log.info("Successfully created ClientProfile for user ID: {}", event.getId());
+    }
+
+    @Override
+    public List<ClientProfileDto> getAllProfiles() {
+        return clientProfileRepository.findAll()
+                .stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -95,35 +105,29 @@ public class ClientProfileServiceImpl implements ClientProfileService {
 
     @Override
     @Transactional
-    public ClientProfileDto updateProfile(Long clientId, UpdateClientProfileRequest request) {
+    public ClientProfileDto updateProfile(Long clientId, UpdateClientProfileRequest updateClientProfileRequest) {
+        log.info("Updating client profile for user id: {}", clientId);
         ClientProfile profile = clientProfileRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client profile not found"));
 
-        if (request.getAge() != null)
-            profile.setAge(request.getAge());
-        if (request.getGender() != null)
-            profile.setGender(request.getGender());
-        if (request.getExercisesRegularly() != null)
-            profile.setExercisesRegularly(request.getExercisesRegularly());
-        if (request.getHeight() != null)
-            profile.setHeight(request.getHeight());
-        if (request.getHeightUnit() != null)
-            profile.setHeightUnit(request.getHeightUnit());
-        if (request.getWeight() != null)
-            profile.setWeight(request.getWeight());
-        if (request.getWeightUnit() != null)
-            profile.setWeightUnit(request.getWeightUnit());
-        if (request.getGoal() != null)
-            profile.setGoal(request.getGoal());
-        if (request.getHealthConditions() != null) {
-            profile.getHealthConditions().clear();
-            profile.getHealthConditions().addAll(request.getHealthConditions());
+        if (updateClientProfileRequest.getAge() != null)
+            profile.setAge(updateClientProfileRequest.getAge());
+        if (updateClientProfileRequest.getGender() != null)
+            profile.setGender(updateClientProfileRequest.getGender());
+        if (updateClientProfileRequest.getWeight() != null)
+            profile.setWeight(updateClientProfileRequest.getWeight());
+        if (updateClientProfileRequest.getHeight() != null)
+            profile.setHeight(updateClientProfileRequest.getHeight());
+        if (updateClientProfileRequest.getGoal() != null)
+            profile.setGoal(updateClientProfileRequest.getGoal());
+        if (updateClientProfileRequest.getPhoneNumber() != null)
+            profile.setPhoneNumber(updateClientProfileRequest.getPhoneNumber());
+        if (updateClientProfileRequest.getHealthConditions() != null) {
+            profile.setHealthConditions(updateClientProfileRequest.getHealthConditions());
         }
-        if (request.getPhoneNumber() != null)
-            profile.setPhoneNumber(request.getPhoneNumber());
 
-        profile = clientProfileRepository.save(profile);
-        return mapToDto(profile);
+        ClientProfile saved = clientProfileRepository.save(profile);
+        return mapToDto(saved);
     }
 
     @Override
@@ -138,8 +142,39 @@ public class ClientProfileServiceImpl implements ClientProfileService {
 
     @Override
     @Transactional
+    public String uploadProfilePicture(Long clientId, MultipartFile file) {
+        log.info("Uploading profile picture for client: {}", clientId);
+        ClientProfile profile = clientProfileRepository.findById(clientId)
+                .orElseGet(() -> clientProfileRepository.save(ClientProfile.builder().id(clientId).build()));
+
+        if (profile.getProfilePictureUrl() != null) {
+            supabaseStorageService.deleteImage(profile.getProfilePictureUrl());
+        }
+
+        String path = supabaseStorageService.uploadImage(file);
+        profile.setProfilePictureUrl(path);
+        clientProfileRepository.save(profile);
+
+        return path;
+    }
+
+    @Override
+    @Transactional
+    public void deleteProfilePicture(Long clientId) {
+        log.info("Deleting profile picture for client: {}", clientId);
+        ClientProfile profile = clientProfileRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client profile not found"));
+
+        if (profile.getProfilePictureUrl() != null) {
+            supabaseStorageService.deleteImage(profile.getProfilePictureUrl());
+            profile.setProfilePictureUrl(null);
+            clientProfileRepository.save(profile);
+        }
+    }
+
+    @Override
+    @Transactional
     public void redeemPoints(Long clientId, Integer points, Long orderId) {
-        // Idempotency check
         if (pointOperationRepository.existsByOrderIdAndOperationType(orderId, PointOperationType.REDEMPTION)) {
             log.info("Point redemption already processed for order ID: {}. Skipping.", orderId);
             return;
@@ -149,13 +184,12 @@ public class ClientProfileServiceImpl implements ClientProfileService {
                 .orElseThrow(() -> new RuntimeException("Client profile not found"));
 
         if (profile.getLoyaltyPoints() < points) {
-            throw new RuntimeException("Insufficient loyalty points. Available: " + profile.getLoyaltyPoints() + ", requested: " + points);
+            throw new RuntimeException("Insufficient loyalty points");
         }
 
         profile.setLoyaltyPoints(profile.getLoyaltyPoints() - points);
         clientProfileRepository.save(profile);
 
-        // Record operation for idempotency
         pointOperationRepository.save(PointOperation.builder()
                 .client(profile)
                 .orderId(orderId)
@@ -169,7 +203,6 @@ public class ClientProfileServiceImpl implements ClientProfileService {
     @Override
     @Transactional
     public void addPoints(Long clientId, Integer points, Long orderId) {
-        // Idempotency check
         if (pointOperationRepository.existsByOrderIdAndOperationType(orderId, PointOperationType.EARNING)) {
             log.info("Point earning already processed for order ID: {}. Skipping.", orderId);
             return;
@@ -181,7 +214,6 @@ public class ClientProfileServiceImpl implements ClientProfileService {
         profile.setLoyaltyPoints(profile.getLoyaltyPoints() + points);
         clientProfileRepository.save(profile);
 
-        // Record operation for idempotency
         pointOperationRepository.save(PointOperation.builder()
                 .client(profile)
                 .orderId(orderId)
@@ -195,7 +227,6 @@ public class ClientProfileServiceImpl implements ClientProfileService {
     @Override
     @Transactional
     public void rollbackRedemption(Long clientId, Integer points, Long orderId) {
-        // Idempotency check
         if (pointOperationRepository.existsByOrderIdAndOperationType(orderId, PointOperationType.ROLLBACK)) {
             log.info("Point rollback already processed for order ID: {}. Skipping.", orderId);
             return;
@@ -207,7 +238,6 @@ public class ClientProfileServiceImpl implements ClientProfileService {
         profile.setLoyaltyPoints(profile.getLoyaltyPoints() + points);
         clientProfileRepository.save(profile);
 
-        // Record operation for idempotency
         pointOperationRepository.save(PointOperation.builder()
                 .client(profile)
                 .orderId(orderId)
@@ -219,6 +249,11 @@ public class ClientProfileServiceImpl implements ClientProfileService {
     }
 
     private ClientProfileDto mapToDto(ClientProfile profile) {
+        String signedPictureUrl = null;
+        if (profile.getProfilePictureUrl() != null) {
+            signedPictureUrl = supabaseStorageService.getSignedUrl(profile.getProfilePictureUrl());
+        }
+
         return ClientProfileDto.builder()
                 .id(profile.getId())
                 .age(profile.getAge())
@@ -231,6 +266,7 @@ public class ClientProfileServiceImpl implements ClientProfileService {
                 .goal(profile.getGoal())
                 .healthConditions(profile.getHealthConditions())
                 .phoneNumber(profile.getPhoneNumber())
+                .profilePictureUrl(signedPictureUrl)
                 .loyaltyPoints(profile.getLoyaltyPoints())
                 .build();
     }

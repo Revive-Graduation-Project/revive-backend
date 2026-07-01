@@ -24,7 +24,7 @@ spring:
       resourceserver:
         jwt:
           secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-          jws-algorithm: HS384
+          jws-algorithms: HS384
 
   rabbitmq:
     # Uses 'rabbitmq' for Docker, falls back to 'localhost' for IDE
@@ -104,6 +104,7 @@ spring:
     password: postgres
     driver-class-name: org.postgresql.Driver
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEV profile — Docker Compose run
 # ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ spring:
 server:
   port: 8080
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  PROD profile — Railway deployment
 # ─────────────────────────────────────────────────────────────────────────────
@@ -132,10 +134,13 @@ spring:
       on-profile: prod
 
   datasource:
-    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/order_db?sslmode=require&channel_binding=require
-    username: neondb_owner
-    password: npg_tHN2wIgpPo6E
+    url: ${ORDER_DB_URL:${ORDER_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${ORDER_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${ORDER_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
 
   jpa:
     hibernate:

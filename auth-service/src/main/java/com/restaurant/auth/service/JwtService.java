@@ -15,6 +15,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -26,6 +27,9 @@ public class JwtService {
     @Value("${app.jwt.expiration-ms}")
     private long expirationMs;
 
+    @Value("${app.jwt.refresh-expiration-ms}")
+    private long refreshExpirationMs;
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
@@ -36,7 +40,17 @@ public class JwtService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", user.getId());
         extraClaims.put("role", user.getRole().name());
-        return buildToken(extraClaims, new SecurityUser(user));
+        return buildToken(extraClaims, new SecurityUser(user), expirationMs);
+    }
+
+    /**
+     * Generates a signed JWT refresh token for the given user.
+     */
+    public String generateRefreshToken(User user, String familyId) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("type", "refresh");
+        extraClaims.put("family", familyId);
+        return buildToken(extraClaims, new SecurityUser(user), refreshExpirationMs, UUID.randomUUID().toString());
     }
 
     /**
@@ -57,14 +71,41 @@ public class JwtService {
         }
     }
 
+    public boolean isRefreshTokenValid(String token, User user) {
+        try {
+            Claims claims = extractAllClaims(token);
+            String tokenType = claims.get("type", String.class);
+            String tokenFamily = claims.get("family", String.class);
+            String tokenJti = claims.getId();
+
+            return "refresh".equals(tokenType)
+                    && tokenJti != null
+                    && tokenFamily != null
+                    && user.getEmail().equals(claims.getSubject())
+                    && tokenFamily.equals(user.getRefreshTokenFamily())
+                    && !isTokenExpired(token);
+        } catch (ExpiredJwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public long getRefreshExpirationSeconds() {
+        return refreshExpirationMs / 1000;
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
+        return buildToken(extraClaims, userDetails, expiration, UUID.randomUUID().toString());
+    }
+
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration, String jti) {
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(userDetails.getUsername())
+                .id(jti)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
     }

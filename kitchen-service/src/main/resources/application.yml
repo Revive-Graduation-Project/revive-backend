@@ -51,7 +51,7 @@ app:
     queues:
       user-created:
         name: user.created.queue
-        routing-key: user.created
+        routing-key: user.created.chef
         dlq-name: user.created.queue.dlq
         dlq-routing-key: user.created.dlq
       order-created:
@@ -59,6 +59,7 @@ app:
         routing-key: order.created
         dlq-name: order.created.queue.dlq
         dlq-routing-key: order.created.dlq
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run
@@ -70,16 +71,17 @@ spring:
       on-profile: default
 
   datasource:
-    url: jdbc:postgresql://localhost:5436/kitchen_db
-    username: postgres
-    password: postgres
+    url: ${KITCHEN_DB_URL:jdbc:postgresql://localhost:5436/kitchen_db}
+    username: ${KITCHEN_DB_USERNAME:postgres}
+    password: ${KITCHEN_DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEV profile — Docker Compose run
@@ -91,19 +93,20 @@ spring:
       on-profile: dev
 
   datasource:
-    url: jdbc:postgresql://kitchen-db:5432/kitchen_db
-    username: postgres
-    password: postgres
+    url: ${KITCHEN_DB_URL:jdbc:postgresql://kitchen-db:5432/kitchen_db}
+    username: ${KITCHEN_DB_USERNAME:postgres}
+    password: ${KITCHEN_DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    host: rabbitmq
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 server:
   port: 8080
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PROD profile — Railway deployment
@@ -115,13 +118,13 @@ spring:
       on-profile: prod
 
   datasource:
-    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/kitchen_db?sslmode=require&channel_binding=require
-    username: neondb_owner
-    password: npg_tHN2wIgpPo6E
+    url: ${KITCHEN_DB_URL:${KITCHEN_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${KITCHEN_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${KITCHEN_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    addresses: amqps://jpndmhye:pPZzD9atkwLkSBQwt6bCBV-ATQrBzxCf@seal.lmq.cloudamqp.com/jpndmhye
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
 
   jpa:
     hibernate:

@@ -2,6 +2,7 @@ package com.restaurant.menu.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -25,6 +26,9 @@ public class Meal {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(name = "description")
+    private String description;
+
     /**
      * Stores the full list of nutrients as a JSON column.
      * Each entry has: nutrientName, value, unitName.
@@ -47,6 +51,19 @@ public class Meal {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
+
+    @Builder.Default
+    @Column(name = "has_discount", nullable = false)
+    @ColumnDefault("false")
+    private Boolean hasDiscount = false;
+
+    @Builder.Default
+    @Column(name = "discount_percentage", nullable = false)
+    @ColumnDefault("0.0")
+    private Double discountPercentage = 0.0;
+
+    @Column(name = "image_url")
+    private String imageUrl;
 
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MealIngredient> mealIngredients;

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
 # Standalone build — gateway-service is NOT a child of the parent POM,
 # so we only need its own pom.xml (no root pom.xml required).
@@ -32,7 +33,7 @@ EOF
 # Copy POM first (dependency caching layer)
 COPY pom.xml ./pom.xml
 
-# Download dependencies (cached unless pom.xml changes)
+# Download dependencies (Docker layer caching will cache this step if pom.xml doesn't change)
 RUN mvn dependency:go-offline -B
 
 # Copy source and build

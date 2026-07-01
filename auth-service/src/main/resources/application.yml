@@ -10,6 +10,9 @@ spring:
   application:
     name: auth-service
 
+  profiles:
+    default: local
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -29,7 +32,9 @@ springdoc:
 app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    expiration-ms: 86400000   # 24 hours
+    expiration-ms: 86400000 # 24 hours
+    refresh-expiration-ms: 604800000 # 7 days
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEFAULT profile — local IDE run
@@ -41,16 +46,17 @@ spring:
       on-profile: default
 
   datasource:
-    url: jdbc:postgresql://localhost:5431/auth_db
-    username: postgres
-    password: postgres
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5431/auth_db}
+    username: ${AUTH_DB_USERNAME:postgres}
+    password: ${AUTH_DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DEV profile — Docker Compose run
@@ -62,19 +68,20 @@ spring:
       on-profile: dev
 
   datasource:
-    url: jdbc:postgresql://auth-db:5432/auth_db
-    username: postgres
-    password: postgres
+    url: ${AUTH_DB_URL:jdbc:postgresql://auth-db:5432/auth_db}
+    username: ${AUTH_DB_USERNAME:postgres}
+    password: ${AUTH_DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    host: rabbitmq
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 server:
   port: 8080
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PROD profile — Railway deployment
@@ -86,13 +93,13 @@ spring:
       on-profile: prod
 
   datasource:
-    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/auth_db?sslmode=require&channel_binding=require
-    username: neondb_owner
-    password: npg_tHN2wIgpPo6E
+    url: ${AUTH_DB_URL:${AUTH_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${AUTH_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${AUTH_DB_PASSWORD:${PROD_DB_PASSWORD}}
     driver-class-name: org.postgresql.Driver
 
   rabbitmq:
-    addresses: amqps://jpndmhye:pPZzD9atkwLkSBQwt6bCBV-ATQrBzxCf@seal.lmq.cloudamqp.com/jpndmhye
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
 
   jpa:
     hibernate:

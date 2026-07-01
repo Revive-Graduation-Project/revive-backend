@@ -17,6 +17,8 @@ public class RabbitMQConfig {
     // ── Exchange names & routing keys (constants for easy reuse) ─────────────
     public static final String EXCHANGE_NAME = "restaurant.events.exchange";
     public static final String ROUTING_KEY_CREATED = "user.created";
+    public static final String ROUTING_KEY_CLIENT_CREATED = "user.created.client";
+    public static final String ROUTING_KEY_CHEF_CREATED = "user.created.chef";
     public static final String COMPENSATION_QUEUE = "auth.compensation.queue";
     public static final String COMPENSATION_KEY = "chef.profile.failed";
 
