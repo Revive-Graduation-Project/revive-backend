@@ -1,7 +1,6 @@
 package com.restaurant.auth.service;
 
 import com.restaurant.auth.config.RabbitMQConfig;
-import com.restaurant.auth.config.SecurityUser;
 import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;

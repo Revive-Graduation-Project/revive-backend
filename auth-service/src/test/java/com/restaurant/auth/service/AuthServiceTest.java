@@ -145,7 +145,7 @@ class AuthServiceTest {
     @DisplayName("refreshToken() returns a new auth response when the refresh token is valid")
     void refreshToken_validRefresh_returnsNewToken() {
         savedUser.setRefreshTokenFamily("family-1");
-        savedUser.setRefreshTokenHash("f2d4d4f7a1dbf9b0ab3d2a1970e95d5b0e3f1f24d0d0f2e9f5d77a6f6d6f1f9a");
+        savedUser.setRefreshTokenHash("0eb17643d4e9261163783a420859c92c7d212fa9624106a12b510afbec266120");
         given(jwtService.extractEmail("refresh-token")).willReturn("john@example.com");
         given(userRepository.findByEmail("john@example.com")).willReturn(Optional.of(savedUser));
         given(jwtService.isRefreshTokenValid(eq("refresh-token"), any(User.class))).willReturn(true);
@@ -155,7 +155,7 @@ class AuthServiceTest {
         AuthTokenPair response = authService.refreshToken("refresh-token");
 
         assertThat(response.token()).isEqualTo("new-jwt-token");
-        verify(jwtService).generateRefreshToken(savedUser);
+        verify(jwtService).generateRefreshToken(eq(savedUser), anyString());
     }
 
     @Test
