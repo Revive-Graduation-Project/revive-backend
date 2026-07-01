@@ -79,10 +79,8 @@ public class ChefServiceImpl implements ChefService {
     }
 
     private ChefProfile findChef(Long id) {
-
         return chefProfileRepository.findById(id)
                 .orElseThrow(() -> new ChefNotFoundException(id));
-
     }
 
     @Override

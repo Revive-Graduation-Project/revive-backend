@@ -178,6 +178,7 @@ class TicketServiceImplTest {
         KitchenTicketDTO result = ticketService.updateTicketStatus(1L, TicketStatus.PREPARING);
 
         assertEquals(TicketStatus.PREPARING, ticket.getStatus());
+        assertEquals(TicketStatus.PREPARING, result.status());
         verifyNoInteractions(publisher);
     }
 

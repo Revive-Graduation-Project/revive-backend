@@ -123,6 +123,11 @@ public class TicketServiceImpl implements TicketService {
     public void cancelKitchenTicket(Long orderId, String sagaId, String correlationId) {
         kitchenTicketRepository.findByOrderId(orderId).ifPresentOrElse(
                 ticket -> {
+                    if(ticket.getStatus() == TicketStatus.CANCELED)
+                    {
+                        log.info("Ticket already canceled, skipping. Order ID: {}" , orderId);
+                        return;
+                    }
                     if (ticket.getStatus() == TicketStatus.QUEUED) {
                         ticket.setStatus(TicketStatus.CANCELED);
                         kitchenTicketRepository.save(ticket);
