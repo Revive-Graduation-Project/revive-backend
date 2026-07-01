@@ -9,6 +9,8 @@ import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.enums.OrderStatus;
+import com.restaurant.order.enums.PaymentMethod;
+import com.restaurant.order.events.OrderCancellationEvent;
 import com.restaurant.order.events.OrderCreatedEvent;
 import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
@@ -22,14 +24,20 @@ import com.restaurant.order.messaging.MessagePublisher;
 import com.restaurant.order.repository.OrderRepository;
 import com.restaurant.order.service.OrderCalculator;
 import com.restaurant.order.service.OrderService;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -43,76 +51,94 @@ public class OrderServiceImpl implements OrderService {
     private final MenuClient menuClient;
     private final PaymentServiceClient paymentServiceClient;
 
-    @Transactional(rollbackFor = Exception.class)
+    @Autowired
+    @Lazy
+    private OrderServiceImpl self = this;
+
+    public record CancelResult(OrderStatus previousStatus, Order order) {}
+
+    //  @Transactional is not defined to prevent DB locking during HTTP calls
     @Override
     public OrderResponse placeOrder(PlaceOrderRequest request, Long clientId) {
         log.info("Placing order for customerId: {}", clientId);
 
         // 1. Validate points
         int pointsToRedeem = request.points() != null ? request.points() : 0;
-        int discount = switch (pointsToRedeem){
+        int discount = switch (pointsToRedeem) {
             case 0 -> 0;
             case 100 -> 10;
             case 200 -> 20;
             case 300 -> 30;
-            default -> throw new PointsException(
-                    "Invalid redemption points. Allowed values are 100, 200, or 300." // cancel order process
-            );
+            default -> throw new PointsException("Invalid redemption points. Allowed values are 100, 200, or 300.");
         };
 
         Order order = Order.builder()
                 .clientId(clientId)
                 .discount(discount)
+                .paymentMethod(request.paymentMethod())
                 .build();
 
-        // 2. Fetch price snapshots from menu-service and build items
+        // 2. Fetch price snapshots one by one (Outside of DB transaction)
         for (OrderItemRequest itemReq : request.items()) {
-            MealPriceSnapshot meal = menuClient.getMealById(itemReq.mealId());
-            order.getItems().add(OrderItem.builder()
-                    .order(order)
-                    .mealId(meal.id())
-                    .snapshotName(meal.name())
-                    .snapshotPrice(meal.price())
-                    .quantity(itemReq.quantity())
-                    .build());
+            try {
+                MealPriceSnapshot meal = menuClient.getMealById(itemReq.mealId());
+                order.getItems().add(OrderItem.builder()
+                        .order(order)
+                        .mealId(meal.id())
+                        .snapshotName(meal.name())
+                        .snapshotPrice(meal.price())
+                        .quantity(itemReq.quantity())
+                        .build());
+            } catch (Exception e) {
+                log.error("Failed to fetch meal from Menu Service for ID: {}", itemReq.mealId(), e);
+                throw new MenuServiceException("Meal not found or Menu Service unavailable for ID: " + itemReq.mealId());
+            }
         }
 
-        // 3. Calculate total price (with point discount if applicable)
+        // 3. Calculate total price
         orderCalculator.calculateTotals(order);
 
-        // 4. Reserve stock — if this fails, nothing is written to DB
+        // 4. Reserve stock via HTTP
         log.info("Reserving stock for order...");
         try {
             menuClient.reserveStock(request.items());
-        } catch (Exception e){
+        } catch (Exception e) {
             log.error("Failed to reserve stock for order.", e);
             throw new MenuServiceException("Cannot reserve stock for order. The stock may be insufficient");
         }
 
         try {
-            // 5. Persist to DB — status starts as PENDING
-            Order savedOrder = orderRepository.save(order);
+            // 5. Persist to DB using the private transactional method (Protects the DB connection pool)
+            Order savedOrder = self.saveInitialOrder(order);
             log.info("Order saved with id: {} and status PENDING", savedOrder.getId());
 
-            // 6. Trigger next step in saga
+            // 6. Trigger next step in saga via Network/RabbitMQ
             if (pointsToRedeem != 0) {
                 log.info("Triggering async point redemption for {} points...", pointsToRedeem);
                 publishPointRedemptionRequestedEvent(savedOrder);
             } else {
-                savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
-                orderRepository.save(savedOrder);
-                createPaymentIntentSync(savedOrder);
+                if (!request.paymentMethod().equals(PaymentMethod.CASH)) {
+                    savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
+                    createPaymentIntentSync(savedOrder); // HTTP call
+                    self.updateOrderInDb(savedOrder);         // Save intent IDs
+                } else {
+                    log.info("Payment method is CASH for order {}, skipping payment service", savedOrder.getId());
+                    publishOrderCreatedEvent(savedOrder);
+                }
             }
-
             return orderMapper.toResponse(savedOrder);
+
         } catch (Exception e) {
             log.error("Failed to complete order placement for clientId: {}. Rolling back stock.", clientId, e);
             try {
                 menuClient.rollbackStock(buildItemRequests(order));
+                if (order.getId() != null) {
+                    self.markOrderAsFailed(order.getId());
+                }
             } catch (Exception rollbackEx) {
-                log.error("CRITICAL: Failed to rollback stock after order placement failure for clientId: {}", clientId, rollbackEx);
+                log.error("CRITICAL: Failed to rollback stock after order placement failure", rollbackEx);
             }
-            throw e; // Re-throw the original exception (PointsException, PaymentException, or DB exception)
+            throw e;
         }
     }
 
@@ -123,15 +149,13 @@ public class OrderServiceImpl implements OrderService {
                 order -> {
                     try {
                         if (order.getStatus() == OrderStatus.CONFIRMED) {
-                            log.info("Order {} already confirmed, skipping.", orderId);
                             return;
                         }
                         order.setStatus(OrderStatus.CONFIRMED);
                         orderRepository.save(order);
                         log.info("Order {} status updated to CONFIRMED (ticket {})", orderId, ticketId);
 
-                        // Reward points: 1 point per 5 EGP spent
-                        if(order.getDiscount() == 0) {
+                        if (order.getDiscount() == 0) {
                             int pointsToReward = order.getTotalPrice().intValue() / 5;
                             if (pointsToReward > 0) {
                                 messagePublisher.publishRewardPointsEarned(
@@ -144,7 +168,7 @@ public class OrderServiceImpl implements OrderService {
                         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
                     }
                 },
-                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for confirmation, orderId: {}", orderId)
+                () -> log.error("Order not found for confirmation, orderId: {}", orderId)
         );
     }
 
@@ -153,27 +177,14 @@ public class OrderServiceImpl implements OrderService {
     public void markPaymentSucceeded(Long orderId) {
         orderRepository.findById(orderId).ifPresentOrElse(
                 order -> {
-                    try {
-                        if (order.getStatus() == OrderStatus.PAID) {
-                            log.info("Order {} already marked as PAID, skipping.", orderId);
-                            return;
-                        }
 
-                        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
-                            log.warn("Order {} is in status {}, expected AWAITING_PAYMENT. Ignoring payment success.", orderId, order.getStatus());
-                            return;
-                        }
+                    if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) return;
 
-                        order.setStatus(OrderStatus.PAID);
-                        orderRepository.save(order);
-                        log.info("Payment succeeded for order {}. Notifying kitchen...", orderId);
-                        publishOrderCreatedEvent(order);
-                    } catch (Exception e) {
-                        log.error("MANUAL INTERVENTION REQUIRED: Failed to process payment success for order {}. Error: {}", orderId, e.getMessage());
-                        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-                    }
+                    order.setStatus(OrderStatus.PAID);
+                    orderRepository.save(order);
+                    publishOrderCreatedEvent(order);
                 },
-                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for payment success, ID: {}", orderId)
+                () -> log.error("Order not found for payment success, ID: {}", orderId)
         );
     }
 
@@ -184,42 +195,65 @@ public class OrderServiceImpl implements OrderService {
         cancelOrder(orderId, "Payment failed: " + reason);
     }
 
-
-
-    @Transactional
     @Override
     public void markPointRedemptionSucceeded(Long orderId) {
         orderRepository.findById(orderId).ifPresentOrElse(
                 order -> {
-                    try {
-                        if (order.getStatus() == OrderStatus.AWAITING_PAYMENT || order.getStatus() == OrderStatus.PAID) {
-                            log.info("Order {} already processed point redemption, skipping.", orderId);
-                            return;
-                        }
+                    if (order.getStatus() != OrderStatus.PENDING) return;
 
-                        if (order.getStatus() != OrderStatus.PENDING) {
-                            log.warn("Order {} is in status {}, expected PENDING. Ignoring point redemption success.", orderId, order.getStatus());
-                            return;
-                        }
-
+                    if (!order.getPaymentMethod().equals(PaymentMethod.CASH)) {
                         order.setStatus(OrderStatus.AWAITING_PAYMENT);
-                        orderRepository.save(order);
-                        log.info("Point redemption succeeded for order {}. Proceeding to payment...", orderId);
                         createPaymentIntentSync(order);
-                    } catch (Exception e) {
-                        log.error("MANUAL INTERVENTION REQUIRED: Failed to process point redemption success for order {}. Error: {}", orderId, e.getMessage());
-                        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+                        self.updateOrderInDb(order); // Save intent IDs
+                    } else {
+                        publishOrderCreatedEvent(order);
                     }
                 },
-                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for point redemption success, ID: {}", orderId)
+                () -> log.error("Order not found for point redemption success, ID: {}", orderId)
         );
     }
 
     @Transactional
     @Override
     public void markPointRedemptionFailed(Long orderId, String reason) {
-        log.info("Point redemption failed for order {}, reason: {}. Cancelling order...", orderId, reason);
+        log.info("Point redemption failed for order {}, reason: {}. Cancelling...", orderId, reason);
         cancelOrder(orderId, "Point redemption failed: " + reason);
+    }
+
+    @Override
+    public void processTicketCancellationSuccess(Long orderId) {
+        Order order = self.processTicketCancellationSuccessInDb(orderId);
+        if (order != null) {
+            log.info("Kitchen confirmed cancellation for order ID: {}", orderId);
+            // Trigger refund logic for successful late cancellations, explicitly treating payment as succeeded
+            executeCompensatingTransactions(order, true);
+        } else {
+            log.error("Order not found for ticket cancellation success, ID: {}", orderId);
+        }
+    }
+
+    @Transactional
+    public Order processTicketCancellationSuccessInDb(Long orderId) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order != null) {
+            order.setStatus(OrderStatus.CANCELED);
+            orderRepository.save(order);
+        }
+        return order;
+    }
+
+    // Fix: Added @Transactional and reason parameter
+    @Transactional
+    @Override
+    public void processTicketCancellationFailure(Long orderId, String reason) {
+        orderRepository.findById(orderId).ifPresentOrElse(
+                order -> {
+                    order.setStatus(OrderStatus.CONFIRMED);
+                    orderRepository.save(order);
+                    log.warn("Kitchen refused cancellation for order {}. Reverted to CONFIRMED. Reason: {}", orderId, reason);
+                },
+                () -> log.error("Order not found for ticket cancellation failure, ID: {}", orderId)
+        );
     }
 
     @Override
@@ -229,49 +263,46 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.toResponse(order);
     }
 
-    @Transactional
     @Override
-    public void cancelOrder(Long orderId, String reason) {
-        orderRepository.findById(orderId).ifPresentOrElse(
-                order -> {
-                    try {
-                        if (order.getStatus() == OrderStatus.CANCELLED) {
-                            log.info("Order {} already cancelled, skipping.", orderId);
-                            return;
-                        }
+    public void cancelOrder(Long orderId, @Nullable String reason) {
+        CancelResult result = self.cancelOrderInDb(orderId);
+        Order order = result.order();
+        switch (result.previousStatus()) {
+            case PENDING, AWAITING_PAYMENT, PAID -> {
+                boolean paymentSucceeded = result.previousStatus() == OrderStatus.PAID;
+                log.info("Order {} cancelled. Executing compensations...", orderId);
+                executeCompensatingTransactions(order, paymentSucceeded);
+            }
+            case CONFIRMED -> {
+                messagePublisher.publishOrderCanceled(
+                        new OrderCancellationEvent(orderId),
+                        UUID.randomUUID().toString(),
+                        UUID.randomUUID().toString()
+                );
+            }
+            default -> {}
+        }
+    }
 
-                        // 1. Rollback Stock (Always if not already cancelled and stock was reserved)
-                        if (order.getStatus() != OrderStatus.READY_FOR_PICKUP) {
-                            try {
-                                log.info("Rolling back stock for cancelled order {}", orderId);
-                                menuClient.rollbackStock(buildItemRequests(order));
-                            } catch (Exception e) {
-                                log.error("Failed to rollback stock for cancelled order {}", orderId, e);
-                            }
-                        }
-
-                        // 2. Refund Payment if order was PAID or beyond
-                        if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
-                            log.info("Triggering payment refund for order {}", orderId);
-                            publishPaymentRefundEvent(order);
-                        }
-
-                        // 3. Rollback Points if they were successfully redeemed
-                        if (order.getDiscount() != 0 && order.getStatus() != OrderStatus.PENDING) {
-                            log.info("Triggering point redemption rollback for order {}", orderId);
-                            publishPointRedemptionRollbackEvent(order);
-                        }
-
-                        order.setStatus(OrderStatus.CANCELLED);
-                        orderRepository.save(order);
-                        log.info("Order {} cancelled. Reason: {}", orderId, reason);
-                    } catch (Exception e) {
-                        log.error("MANUAL INTERVENTION REQUIRED: Failed to cancel order {}. Error: {}", orderId, e.getMessage());
-                        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-                    }
-                },
-                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for cancellation, orderId: {}", orderId)
-        );
+    @Transactional(rollbackFor = Exception.class)
+    public CancelResult cancelOrderInDb(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        
+        OrderStatus previousStatus = order.getStatus();
+        switch (previousStatus) {
+            case PENDING, AWAITING_PAYMENT, PAID -> {
+                order.setStatus(OrderStatus.CANCELED);
+                orderRepository.save(order);
+            }
+            case CONFIRMED -> {
+                order.setStatus(OrderStatus.CANCELLATION_PENDING);
+                orderRepository.save(order);
+            }
+            case PREPARING, READY -> throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot cancel order in status: " + previousStatus);
+            case CANCELED, CANCELLATION_PENDING -> log.info("Order {} already cancelled", orderId);
+        }
+        return new CancelResult(previousStatus, order);
     }
 
     @Transactional
@@ -279,24 +310,68 @@ public class OrderServiceImpl implements OrderService {
     public void onTicketReady(Long orderId) {
         orderRepository.findById(orderId).ifPresentOrElse(
                 order -> {
-                    try {
-                        if (order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
-                            log.info("Order {} already marked as READY_FOR_PICKUP, skipping.", orderId);
-                            return;
-                        }
-                        order.setStatus(OrderStatus.READY_FOR_PICKUP);
-                        orderRepository.save(order);
-                    } catch (Exception e) {
-                        log.error("MANUAL INTERVENTION REQUIRED: Failed to mark order {} as ready. Error: {}", orderId, e.getMessage());
-                        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-                    }
+                    order.setStatus(OrderStatus.READY);
+                    orderRepository.save(order);
                 },
-                () -> log.error("MANUAL INTERVENTION REQUIRED: Order not found for ticket ready status, ID: {}", orderId)
+                () -> log.error("Order not found for ticket ready status, ID: {}", orderId)
         );
     }
 
+    @Transactional
+    @Override
+    public void onTicketStarted(Long orderId, Long ticketId) {
+        orderRepository.findById(orderId).ifPresentOrElse(
+                order -> {
+                    order.setStatus(OrderStatus.PREPARING);
+                    orderRepository.save(order);
+                },
+                () -> log.error("Order not found for ticket started status, ID: {}", orderId)
+        );
+    }
+
+    @Override
+    public List<OrderResponse> getClientOrderHistory(Long clientId) {
+        return orderRepository.findDistinctByClientIdOrderByCreatedAtDesc(clientId)
+                .stream()
+                .map(orderMapper::toResponse)
+                .collect(Collectors.toList());
+    }
 
     // --- Private helpers ---
+
+    @Transactional
+    public Order saveInitialOrder(Order order) {
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public void updateOrderInDb(Order order) {
+        orderRepository.save(order);
+    }
+
+    @Transactional
+    public void markOrderAsFailed(Long orderId) {
+        orderRepository.findById(orderId).ifPresent(order -> {
+            order.setStatus(OrderStatus.CANCELED);
+            orderRepository.save(order);
+        });
+    }
+
+    private void executeCompensatingTransactions(Order order, boolean paymentSucceeded) {
+        try {
+            menuClient.rollbackStock(buildItemRequests(order));
+        } catch (Exception e) {
+            log.error("Failed to rollback stock for cancelled order {}", order.getId(), e);
+        }
+
+        if (paymentSucceeded) {
+            publishPaymentRefundEvent(order);
+        }
+
+        if (order.getDiscount() > 0) {
+            publishPointRedemptionRollbackEvent(order);
+        }
+    }
 
     private List<OrderItemRequest> buildItemRequests(Order order) {
         return order.getItems().stream()
@@ -306,10 +381,8 @@ public class OrderServiceImpl implements OrderService {
 
     private void publishOrderCreatedEvent(Order order) {
         try {
-            String sagaId = UUID.randomUUID().toString();
-            String correlationId = UUID.randomUUID().toString();
             messagePublisher.publishOrderCreated(
-                    new OrderCreatedEvent(order.getId()), sagaId, correlationId);
+                    new OrderCreatedEvent(order.getId()), UUID.randomUUID().toString(), UUID.randomUUID().toString());
         } catch (Exception e) {
             log.error("Failed to publish order.created event for orderId: {}", order.getId(), e);
             throw new RuntimeException("Order created but failed to notify kitchen service", e);
@@ -318,46 +391,26 @@ public class OrderServiceImpl implements OrderService {
 
     private void createPaymentIntentSync(Order order) {
         PaymentServiceClient.PaymentIntentResponse response = paymentServiceClient.createPaymentIntent(
-
                 order.getId(), order.getClientId(), order.getTotalPrice(), "egp");
-
         order.setStripePaymentIntentId(response.paymentIntentId());
         order.setStripeClientSecret(response.clientSecret());
-        orderRepository.save(order);
-        log.info("PaymentIntent created and stored for order {}: intentId={}", order.getId(), response.paymentIntentId());
     }
 
     private void publishPointRedemptionRequestedEvent(Order order) {
-        try {
-            String sagaId = UUID.randomUUID().toString();
-            String correlationId = UUID.randomUUID().toString();
-            messagePublisher.publishPointRedemptionRequested(
-                    new PointRedemptionRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10), sagaId, correlationId);
-        } catch (Exception e) {
-            log.error("Failed to publish point-redemption.requested event for orderId: {}", order.getId(), e);
-            throw new PointsException("Order placement failed due to point redemption request failure");
-        }
+        messagePublisher.publishPointRedemptionRequested(
+                new PointRedemptionRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10),
+                UUID.randomUUID().toString(), UUID.randomUUID().toString());
     }
 
     private void publishPointRedemptionRollbackEvent(Order order) {
-        try {
-            String sagaId = UUID.randomUUID().toString();
-            String correlationId = UUID.randomUUID().toString();
-            messagePublisher.publishPointRedemptionRollback(
-                    new PointRedemptionRollbackRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10), sagaId, correlationId);
-        } catch (Exception e) {
-            log.error("CRITICAL: Failed to publish point-redemption.rollback event for orderId: {}", order.getId(), e);
-        }
+        messagePublisher.publishPointRedemptionRollback(
+                new PointRedemptionRollbackRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10),
+                UUID.randomUUID().toString(), UUID.randomUUID().toString());
     }
 
     private void publishPaymentRefundEvent(Order order) {
-        try {
-            String sagaId = UUID.randomUUID().toString();
-            String correlationId = UUID.randomUUID().toString();
-            messagePublisher.publishPaymentRefund(
-                    new PaymentRefundRequestedEvent(order.getId(), order.getClientId(), order.getTotalPrice()), sagaId, correlationId);
-        } catch (Exception e) {
-            log.error("CRITICAL: Failed to publish payment.refund event for orderId: {}", order.getId(), e);
-        }
+        messagePublisher.publishPaymentRefund(
+                new PaymentRefundRequestedEvent(order.getId(), order.getClientId(), order.getTotalPrice()),
+                UUID.randomUUID().toString(), UUID.randomUUID().toString());
     }
 }

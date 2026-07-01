@@ -1,5 +1,6 @@
 package com.restaurant.order.messaging;
 
+import com.restaurant.order.events.OrderCancellationEvent;
 import com.restaurant.order.events.OrderCreatedEvent;
 import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
@@ -50,6 +51,11 @@ public class MessagePublisher {
         log.info("Payment refund requested event published for orderId: {}", event.getOrderId());
     }
 
+    public void publishOrderCanceled(OrderCancellationEvent event, String sagaId, String correlationId) {
+        send("order.canceled", event, sagaId, correlationId);
+        log.info("Order canceled event published for orderId: {}", event.getId());
+    }
+
     private void send(String routingKey, Object payload, @Nullable String sagaId, String correlationId) {
         try {
             rabbitTemplate.convertAndSend(exchange, routingKey, payload, message -> {
@@ -64,4 +70,5 @@ public class MessagePublisher {
             throw e;
         }
     }
+
 }

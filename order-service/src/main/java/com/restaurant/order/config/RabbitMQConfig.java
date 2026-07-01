@@ -64,6 +64,27 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.queues.point-redemption-failed.routing-key}")
     private String pointRedemptionFailedRoutingKey;
 
+    // ticket.started — kitchen marks order as preparing
+    @Value("${app.rabbitmq.queues.ticket-started.name}")
+    private String ticketStartedQueue;
+
+    @Value("${app.rabbitmq.queues.ticket-started.routing-key}")
+    private String ticketStartedRoutingKey;
+
+    // ticket.canceled — kitchen confirms ticket cancellation succeeded
+    @Value("${app.rabbitmq.queues.ticket-canceled.name}")
+    private String ticketCanceledQueue;
+
+    @Value("${app.rabbitmq.queues.ticket-canceled.routing-key}")
+    private String ticketCanceledRoutingKey;
+
+    // ticket.cancellation.failed — kitchen refuses ticket cancellation
+    @Value("${app.rabbitmq.queues.ticket-cancellation-failed.name}")
+    private String ticketCancellationFailedQueue;
+
+    @Value("${app.rabbitmq.queues.ticket-cancellation-failed.routing-key}")
+    private String ticketCancellationFailedRoutingKey;
+
     // --------- Converter ----------
     @Bean
     public MessageConverter converter() {
@@ -114,6 +135,21 @@ public class RabbitMQConfig {
     @Bean
     public Queue pointRedemptionFailedQueue() {
         return QueueBuilder.durable(pointRedemptionFailedQueue).build();
+    }
+
+    @Bean
+    public Queue ticketStartedQueue() {
+        return QueueBuilder.durable(ticketStartedQueue).build();
+    }
+
+    @Bean
+    public Queue ticketCanceledQueue() {
+        return QueueBuilder.durable(ticketCanceledQueue).build();
+    }
+
+    @Bean
+    public Queue ticketCancellationFailedQueue() {
+        return QueueBuilder.durable(ticketCancellationFailedQueue).build();
     }
 
     // --------- Bindings ----------
@@ -171,5 +207,29 @@ public class RabbitMQConfig {
                 .bind(pointRedemptionFailedQueue())
                 .to(restaurantExchange())
                 .with(pointRedemptionFailedRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingTicketStartedQueue() {
+        return BindingBuilder
+                .bind(ticketStartedQueue())
+                .to(restaurantExchange())
+                .with(ticketStartedRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingTicketCanceledQueue() {
+        return BindingBuilder
+                .bind(ticketCanceledQueue())
+                .to(restaurantExchange())
+                .with(ticketCanceledRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingTicketCancellationFailedQueue() {
+        return BindingBuilder
+                .bind(ticketCancellationFailedQueue())
+                .to(restaurantExchange())
+                .with(ticketCancellationFailedRoutingKey);
     }
 }

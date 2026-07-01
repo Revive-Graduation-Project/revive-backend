@@ -2,6 +2,7 @@ package com.restaurant.order.service;
 
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
+import java.util.List;
 
 public interface  OrderService {
 
@@ -13,6 +14,8 @@ public interface  OrderService {
     
     void onTicketReady(Long orderId);
 
+    void onTicketStarted(Long orderId, Long ticketId);
+
     void markPaymentSucceeded(Long orderId);
 
     void markPaymentFailed(Long orderId, String reason);
@@ -21,5 +24,11 @@ public interface  OrderService {
 
     void markPointRedemptionFailed(Long orderId, String reason);
 
+    void processTicketCancellationSuccess(Long orderId);
+
+    void processTicketCancellationFailure(Long orderId , String reason);
+
     OrderResponse retrieveOrder(Long orderId);
+
+    List<OrderResponse> getClientOrderHistory(Long clientId);
 }

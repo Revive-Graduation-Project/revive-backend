@@ -1,5 +1,6 @@
 package com.restaurant.order.dto.request;
 
+import com.restaurant.order.enums.PaymentMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -13,5 +14,8 @@ public record PlaceOrderRequest(
         List<OrderItemRequest> items,
 
         @Min(value = 0, message = "Points to redeem cannot be negative")
-        Integer points
+        Integer points,
+
+        @NotNull(message = "Payment method is required")
+        PaymentMethod paymentMethod
 ) {}
