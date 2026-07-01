@@ -4,10 +4,7 @@ import com.restaurant.order.events.payments.PaymentFailedEvent;
 import com.restaurant.order.events.payments.PaymentSucceededEvent;
 import com.restaurant.order.events.points.PointRedemptionFailedEvent;
 import com.restaurant.order.events.points.PointRedemptionSucceededEvent;
-import com.restaurant.order.events.tickets.TicketCreatedEvent;
-import com.restaurant.order.events.tickets.TicketCreationFailedEvent;
-import com.restaurant.order.events.tickets.TicketReadyEvent;
-import com.restaurant.order.events.tickets.TicketStartedEvent;
+import com.restaurant.order.events.tickets.*;
 import com.restaurant.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,5 +64,17 @@ public class MessageListener {
     public void onPointRedemptionFailed(PointRedemptionFailedEvent event) {
         log.info("Received point-redemption.failed event for orderId: {}, reason: {}", event.getOrderId(), event.getReason());
         orderService.markPointRedemptionFailed(event.getOrderId(), event.getReason());
+    }
+
+    @RabbitListener(queues = "${app.rabbitmq.queues.ticket-canceled.name}")
+    public void onTicketCanceled(TicketCancellationSucceededEvent event) {
+        log.info("Received ticket-canceled event for orderId: {}", event.getId());
+        orderService.processTicketCancellationSuccess(event.getId());
+    }
+
+    @RabbitListener(queues = "${app.rabbitmq.queues.ticket-cancellation-failed.name}")
+    public void onTicketCancellationFailed(TicketCancellationFailedEvent event) {
+        log.info("Received ticket-cancellation-failed event for orderId: {}, reason: {}", event.getId(), event.getMessage());
+        orderService.processTicketCancellationFailure(event.getId() , event.getMessage());
     }
 }

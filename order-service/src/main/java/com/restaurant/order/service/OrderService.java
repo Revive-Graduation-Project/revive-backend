@@ -24,6 +24,10 @@ public interface  OrderService {
 
     void markPointRedemptionFailed(Long orderId, String reason);
 
+    void processTicketCancellationSuccess(Long orderId);
+
+    void processTicketCancellationFailure(Long orderId , String reason);
+
     OrderResponse retrieveOrder(Long orderId);
 
     List<OrderResponse> getClientOrderHistory(Long clientId);

@@ -78,6 +78,12 @@ app:
       ticket-started:
         name: ticket.started.queue
         routing-key: ticket.started
+      ticket-canceled:
+        name: ticket.canceled.queue
+        routing-key: ticket.canceled
+      ticket-cancellation-failed:
+        name: ticket.cancellation.failed.queue
+        routing-key: ticket.cancellation.failed
 
   services:
     menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
