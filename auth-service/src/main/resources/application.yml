@@ -43,7 +43,7 @@ app:
 spring:
   config:
     activate:
-      on-profile: local
+      on-profile: default
 
   datasource:
     url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5431/auth_db}

@@ -96,18 +96,20 @@ class AuthControllerTest {
         }
 
         @Test
-        @DisplayName("POST /auth/signup returns 400 when role is null")
+        @DisplayName("POST /auth/signup-staff returns 400 when role is null")
         void signup_nullRole_returns400() throws Exception {
                 // Build the JSON manually so we can emit `"role": null`
                 String body = """
                                 {
                                   "email": "johndoe@example.com",
                                   "password": "secret123",
+                                  "firstName": "John",
+                                  "lastName": "Doe",
                                   "role": null
                                 }
                                 """;
 
-                mockMvc.perform(post("/auth/signup")
+                mockMvc.perform(post("/auth/staff/signup")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                                 .andExpect(status().isBadRequest())
