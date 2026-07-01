@@ -93,6 +93,8 @@ class MessageListenerTest {
 
     // ── onOrderCancelledFailure (DLQ) ─────────────────────────────────────
 
+    // ── onOrderCancelledFailure (DLQ) ─────────────────────────────────────
+
     @Test
     void shouldPublishTicketCanceledFailedEventOnOrderCancelledDLQ() {
         OrderCanceledEvent event = new OrderCanceledEvent();
@@ -100,6 +102,11 @@ class MessageListenerTest {
 
         messageListener.onOrderCancelledFailure(event, "saga-001", "corr-001");
 
-        verify(publisher).publishTicketCanceledFailed(any(TicketCanceledFailedEvent.class), eq("saga-001"), eq("corr-001"));
+        // Updated to use the correct method name: publishTicketCancellationFailure
+        verify(publisher).publishTicketCancellationFailure(
+                any(TicketCanceledFailedEvent.class),
+                eq("saga-001"),
+                eq("corr-001")
+        );
     }
 }

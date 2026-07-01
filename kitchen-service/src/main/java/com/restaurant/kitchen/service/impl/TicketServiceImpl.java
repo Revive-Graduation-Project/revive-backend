@@ -119,41 +119,22 @@ public class TicketServiceImpl implements TicketService {
         return ticketMapper.toDTO(retrievedTicket);
     }
 
-    @Transactional // Essential to ensure DB atomic commit
+    @Transactional
     public void cancelKitchenTicket(Long orderId, String sagaId, String correlationId) {
         kitchenTicketRepository.findByOrderId(orderId).ifPresentOrElse(
                 ticket -> {
-
-                    if (ticket.getStatus() == TicketStatus.CANCELED)
-                    {
-                        log.info("[SagaID: {}] Kitchen ticket {} is already canceled for order {}",
-                                sagaId, ticket.getId(), orderId);
-                        return;
-                    }
-                    // Check if the ticket is still in a state where cancellation is physically possible
                     if (ticket.getStatus() == TicketStatus.QUEUED) {
                         ticket.setStatus(TicketStatus.CANCELED);
                         kitchenTicketRepository.save(ticket);
-
                         publisher.publishTicketCanceled(new TicketCanceledEvent(orderId, ticket.getId()), correlationId);
-
-                        log.info("[SagaID: {}] Kitchen ticket {} successfully cancelled for order {}",
-                                sagaId, ticket.getId(), orderId);
-
-                        // Optional: Publish a 'KitchenTicketCancelledEvent' here if the Saga expects a success reply
                     } else {
-                        log.error("[SagaID: {}] Critical: Cannot cancel ticket for order {}. Kitchen status is already {}",
-                                sagaId, orderId, ticket.getStatus());
 
-                        // CRITICAL: Throw an exception to fail the transaction or notify your Saga manager
-                        // that the cancellation compensation step failed!
-                        throw new IllegalStateException("Kitchen ticket cannot be cancelled in status: " + ticket.getStatus());
+                        throw new IllegalStateException("Order preparation already started: " + ticket.getStatus());
                     }
                 },
                 () -> {
-                    log.warn("[SagaID: {}] No kitchen ticket found for cancelled order {}", sagaId, orderId);
-                    throw new IllegalStateException("Kitchen ticket not found for orderId: " + orderId);
-
+                    log.warn("[SagaID: {}] Kitchen ticket not found for order {}", sagaId, orderId);
+                    throw new IllegalStateException("Kitchen ticket not found: " + orderId);
                 }
         );
     }

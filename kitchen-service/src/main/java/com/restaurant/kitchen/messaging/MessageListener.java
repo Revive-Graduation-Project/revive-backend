@@ -116,7 +116,7 @@ public class MessageListener {
                     event.getId(),
                     "Kitchen ticket creation failed due to technical error after multiple retries"
             );
-            publisher.publishTicketCanceledFailed(failedEvent, sagaId, correlationId);
+            publisher.publishTicketCancellationFailure(failedEvent, sagaId, correlationId);
 
         } catch (Exception e) {
 

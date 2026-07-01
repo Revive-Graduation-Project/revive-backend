@@ -53,7 +53,7 @@ public class MessagePublisher {
         send("ticket.canceled", event, null, correlationId); // simple point-to-point communication no saga needed
         log.info("Ticket canceled event published for order {} . ticket id: {}", event.getId() , event.getTicketId());
     }
-    public void publishTicketCanceledFailed(TicketCanceledFailedEvent event, String sagaId, String correlationId) {
+    public void publishTicketCancellationFailure(TicketCanceledFailedEvent event, String sagaId, String correlationId) {
         send("ticket.canceled.failed", event, sagaId, correlationId);
         log.info("Ticket canceled failed event published for order {}", event.getId());
     }
