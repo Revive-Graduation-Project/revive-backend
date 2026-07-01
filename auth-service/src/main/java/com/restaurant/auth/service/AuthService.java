@@ -1,6 +1,7 @@
 package com.restaurant.auth.service;
 
 import com.restaurant.auth.config.RabbitMQConfig;
+import com.restaurant.auth.config.SecurityUser;
 import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
 import com.restaurant.auth.dto.AuthRequest;
@@ -13,6 +14,7 @@ import com.restaurant.auth.exception.EmailAlreadyExistsException;
 import com.restaurant.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -43,7 +45,8 @@ public class AuthService {
                         throw new EmailAlreadyExistsException(request.email());
                 }
 
-                // 2. Persist the new user with a hashed password
+
+            // 2. Persist the new user with a hashed password
                 User user = User.builder()
                                 .email(request.email())
                                 .password(passwordEncoder.encode(request.password()))
@@ -72,16 +75,16 @@ public class AuthService {
                                 .healthConditions(request.healthConditions())
                                 .build();
 
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                                rabbitTemplate.convertAndSend(
-                                                RabbitMQConfig.EXCHANGE_NAME,
-                                                RabbitMQConfig.ROUTING_KEY_CLIENT_CREATED,
-                                                event);
-                                log.info("Published UserCreatedEvent for userId={}", savedUser.getId());
-                        }
-                });
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                                @Override
+                                public void afterCommit() {
+                                        publishUserCreatedEvent(savedUser, event);
+                                }
+                        });
+                } else {
+                        publishUserCreatedEvent(savedUser, event);
+                }
 
                 // 4. Return a success message (JWT will be acquired via login later)
                 return new MessageResponse("User registered successfully. Profile creation is pending.");
@@ -132,21 +135,37 @@ public class AuthService {
                                         .firstName(savedUser.getFirstName())
                                         .lastName(savedUser.getLastName())
                                         .build();
-                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                                @Override
-                                public void afterCommit() {
-                                        rabbitTemplate.convertAndSend(
-                                                        RabbitMQConfig.EXCHANGE_NAME,
-                                                        RabbitMQConfig.ROUTING_KEY_CHEF_CREATED,
-                                                        event);
-                                        log.info("Published UserCreatedEvent for chef userId={}", savedUser.getId());
-                                }
-                        });
+                        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                                        @Override
+                                        public void afterCommit() {
+                                                publishUserCreatedEvent(savedUser, event, RabbitMQConfig.ROUTING_KEY_CHEF_CREATED);
+                                        }
+                                });
+                        } else {
+                                publishUserCreatedEvent(savedUser, event, RabbitMQConfig.ROUTING_KEY_CHEF_CREATED);
+                        }
                 }
                 log.info("Finished staff user creation for userId={}", savedUser.getId());
 
                 // 6. Return a success message
                 return new MessageResponse("Staff user registered successfully.");
+        }
+
+        void publishUserCreatedEvent(User savedUser, UserCreatedEvent event) {
+                publishUserCreatedEvent(savedUser, event, RabbitMQConfig.ROUTING_KEY_CLIENT_CREATED);
+        }
+
+        void publishUserCreatedEvent(User savedUser, UserCreatedEvent event, String routingKey) {
+                try {
+                        rabbitTemplate.convertAndSend(
+                                        RabbitMQConfig.EXCHANGE_NAME,
+                                        routingKey,
+                                        event);
+                        log.info("Published UserCreatedEvent for userId={}", savedUser.getId());
+                } catch (AmqpException ex) {
+                        log.warn("Failed to publish user created event for userId={}. Continuing signup flow.", savedUser.getId(), ex);
+                }
         }
 
         // ── Login ─────────────────────────────────────────────────────────────────
@@ -173,4 +192,30 @@ public class AuthService {
                                 user.getFirstName(),
                                 user.getLastName());
         }
+
+    public AuthResponse refreshToken(String refreshToken) {
+        String email;
+
+        try {
+            email = jwtService.extractEmail(refreshToken);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+
+        if (!jwtService.isTokenValid(refreshToken, new SecurityUser(user))) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
+
+        return new AuthResponse(
+                jwtService.generateToken(user),
+                jwtService.generateRefreshToken(user),
+                user.getRole().name(),
+                user.getId(),
+                user.getEmail(),
+                user.getFirstName(),
+                user.getLastName());
+    }
 }

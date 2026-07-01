@@ -67,6 +67,10 @@ public class JwtService {
         }
     }
 
+    public long getRefreshExpirationSeconds() {
+        return refreshExpirationMs / 1000;
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {

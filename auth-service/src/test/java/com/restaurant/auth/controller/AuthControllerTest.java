@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -145,6 +146,21 @@ class AuthControllerTest {
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.token").value("jwt-token-xyz"));
+        }
+
+        @Test
+        @DisplayName("POST /auth/refresh returns 200 and a refreshed token for valid refresh token")
+        void refresh_validRequest_returns200() throws Exception {
+                AuthResponse response = new AuthResponse("new-jwt-token", "new-refresh-token", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
+
+                given(authService.refreshToken("refresh-token-xyz")).willReturn(response);
+
+                mockMvc.perform(post("/auth/refresh")
+                                .cookie(new jakarta.servlet.http.Cookie("refreshToken", "refresh-token-xyz")))
+                                .andExpect(status().isOk())
+                                .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("refreshToken=new-refresh-token")))
+                                .andExpect(jsonPath("$.token").value("new-jwt-token"))
+                                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
         }
 
         @Test
