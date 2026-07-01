@@ -41,4 +41,10 @@ public class User {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "refresh_token_hash", length = 64)
+    private String refreshTokenHash;
+
+    @Column(name = "refresh_token_family")
+    private String refreshTokenFamily;
+
 }

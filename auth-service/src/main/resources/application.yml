@@ -10,6 +10,9 @@ spring:
   application:
     name: auth-service
 
+  profiles:
+    default: local
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -40,7 +43,7 @@ app:
 spring:
   config:
     activate:
-      on-profile: default
+      on-profile: local
 
   datasource:
     url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5431/auth_db}

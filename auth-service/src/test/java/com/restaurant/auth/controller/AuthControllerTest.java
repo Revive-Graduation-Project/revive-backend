@@ -2,7 +2,7 @@ package com.restaurant.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurant.auth.dto.AuthRequest;
-import com.restaurant.auth.dto.AuthResponse;
+import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.exception.GlobalExceptionHandler;
@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -136,7 +137,7 @@ class AuthControllerTest {
         @DisplayName("POST /auth/login returns 200 and a token for valid credentials")
         void login_validRequest_returns200() throws Exception {
                 AuthRequest request = new AuthRequest("johndoe@example.com", "secret123");
-                AuthResponse response = new AuthResponse("jwt-token-xyz", "refresh-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
+                AuthTokenPair response = new AuthTokenPair("jwt-token-xyz", "refresh-token-xyz", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
 
                 given(authService.login(request)).willReturn(response);
 
@@ -145,6 +146,21 @@ class AuthControllerTest {
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.token").value("jwt-token-xyz"));
+        }
+
+        @Test
+        @DisplayName("POST /auth/refresh returns 200 and a refreshed token for valid refresh token")
+        void refresh_validRequest_returns200() throws Exception {
+                AuthTokenPair response = new AuthTokenPair("new-jwt-token", "new-refresh-token", "CLIENT", 1L, "johndoe@example.com", "John", "Doe");
+
+                given(authService.refreshToken("refresh-token-xyz")).willReturn(response);
+
+                mockMvc.perform(post("/auth/refresh")
+                                .cookie(new jakarta.servlet.http.Cookie("refreshToken", "refresh-token-xyz")))
+                                .andExpect(status().isOk())
+                                .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("refreshToken=new-refresh-token")))
+                                .andExpect(jsonPath("$.token").value("new-jwt-token"))
+                                .andExpect(jsonPath("$.refreshToken").doesNotExist());
         }
 
         @Test
