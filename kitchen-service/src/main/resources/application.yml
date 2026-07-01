@@ -1,13 +1,14 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  KITCHEN-SERVICE — Multi-Environment Configuration                         ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: kitchen-service
-
-  datasource:
-    # Uses 'kitchen-db' for Docker, falls back to 'localhost' for  IDE
-    url: jdbc:postgresql://${DB_HOST:kitchen-db}:${DB_PORT:5432}/kitchen_db
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -23,14 +24,9 @@ spring:
       resourceserver:
         jwt:
           secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-          jws-algorithm: HS384
+          jws-algorithms: HS384
 
   rabbitmq:
-    # Uses 'rabbitmq' for Docker, falls back to 'localhost' for IDE
-    host: ${RABBITMQ_HOST:rabbitmq}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
     listener:
       simple:
         retry:
@@ -42,16 +38,20 @@ spring:
         default-requeue-rejected: false
 
 server:
-  # Defaults to 8080 (Docker standard), can be overridden to 8086 locally via ENV
-  port: ${SERVER_PORT:8080}
+  port: 8086
 
+springdoc:
+  api-docs:
+    path: /api/kitchen/v3/api-docs
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
       user-created:
         name: user.created.queue
-        routing-key: user.created
+        routing-key: user.created.chef
         dlq-name: user.created.queue.dlq
         dlq-routing-key: user.created.dlq
       order-created:
@@ -64,3 +64,83 @@ app:
         routing-key: order.canceled
         dlq-name: order.canceled.queue.dlq
         dlq-routing-key: order.canceled.dlq
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: ${KITCHEN_DB_URL:jdbc:postgresql://localhost:5436/kitchen_db}
+    username: ${KITCHEN_DB_USERNAME:postgres}
+    password: ${KITCHEN_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${KITCHEN_DB_URL:jdbc:postgresql://kitchen-db:5432/kitchen_db}
+    username: ${KITCHEN_DB_USERNAME:postgres}
+    password: ${KITCHEN_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${KITCHEN_DB_URL:${KITCHEN_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${KITCHEN_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${KITCHEN_DB_PASSWORD:${PROD_DB_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"
