@@ -27,6 +27,8 @@ import com.restaurant.order.service.OrderService;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,12 @@ public class OrderServiceImpl implements OrderService {
     private final OrderCalculator orderCalculator;
     private final MenuClient menuClient;
     private final PaymentServiceClient paymentServiceClient;
+
+    @Autowired
+    @Lazy
+    private OrderServiceImpl self = this;
+
+    public record CancelResult(OrderStatus previousStatus, Order order) {}
 
     //  @Transactional is not defined to prevent DB locking during HTTP calls
     @Override
@@ -101,7 +109,7 @@ public class OrderServiceImpl implements OrderService {
 
         try {
             // 5. Persist to DB using the private transactional method (Protects the DB connection pool)
-            Order savedOrder = saveInitialOrder(order);
+            Order savedOrder = self.saveInitialOrder(order);
             log.info("Order saved with id: {} and status PENDING", savedOrder.getId());
 
             // 6. Trigger next step in saga via Network/RabbitMQ
@@ -112,7 +120,7 @@ public class OrderServiceImpl implements OrderService {
                 if (!request.paymentMethod().equals(PaymentMethod.CASH)) {
                     savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
                     createPaymentIntentSync(savedOrder); // HTTP call
-                    updateOrderInDb(savedOrder);         // Save intent IDs
+                    self.updateOrderInDb(savedOrder);         // Save intent IDs
                 } else {
                     log.info("Payment method is CASH for order {}, skipping payment service", savedOrder.getId());
                     publishOrderCreatedEvent(savedOrder);
@@ -125,7 +133,7 @@ public class OrderServiceImpl implements OrderService {
             try {
                 menuClient.rollbackStock(buildItemRequests(order));
                 if (order.getId() != null) {
-                    markOrderAsFailed(order.getId());
+                    self.markOrderAsFailed(order.getId());
                 }
             } catch (Exception rollbackEx) {
                 log.error("CRITICAL: Failed to rollback stock after order placement failure", rollbackEx);
@@ -187,7 +195,6 @@ public class OrderServiceImpl implements OrderService {
         cancelOrder(orderId, "Payment failed: " + reason);
     }
 
-    @Transactional
     @Override
     public void markPointRedemptionSucceeded(Long orderId) {
         orderRepository.findById(orderId).ifPresentOrElse(
@@ -196,9 +203,8 @@ public class OrderServiceImpl implements OrderService {
 
                     if (!order.getPaymentMethod().equals(PaymentMethod.CASH)) {
                         order.setStatus(OrderStatus.AWAITING_PAYMENT);
-                        orderRepository.save(order);
                         createPaymentIntentSync(order);
-                        orderRepository.save(order); // Save intent IDs
+                        self.updateOrderInDb(order); // Save intent IDs
                     } else {
                         publishOrderCreatedEvent(order);
                     }
@@ -214,21 +220,26 @@ public class OrderServiceImpl implements OrderService {
         cancelOrder(orderId, "Point redemption failed: " + reason);
     }
 
-    // Fix: Added @Transactional
-    @Transactional
     @Override
     public void processTicketCancellationSuccess(Long orderId) {
-        orderRepository.findById(orderId).ifPresentOrElse(
-                order -> {
-                    order.setStatus(OrderStatus.CANCELED);
-                    orderRepository.save(order);
-                    log.info("Kitchen confirmed cancellation for order ID: {}", orderId);
+        Order order = self.processTicketCancellationSuccessInDb(orderId);
+        if (order != null) {
+            log.info("Kitchen confirmed cancellation for order ID: {}", orderId);
+            // Trigger refund logic for successful late cancellations, explicitly treating payment as succeeded
+            executeCompensatingTransactions(order, true);
+        } else {
+            log.error("Order not found for ticket cancellation success, ID: {}", orderId);
+        }
+    }
 
-                    // Trigger refund logic for successful late cancellations
-                    executeCompensatingTransactions(order);
-                },
-                () -> log.error("Order not found for ticket cancellation success, ID: {}", orderId)
-        );
+    @Transactional
+    public Order processTicketCancellationSuccessInDb(Long orderId) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order != null) {
+            order.setStatus(OrderStatus.CANCELED);
+            orderRepository.save(order);
+        }
+        return order;
     }
 
     // Fix: Added @Transactional and reason parameter
@@ -252,36 +263,46 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.toResponse(order);
     }
 
-    // Fix: Added full Saga Compensations
-    @Transactional(rollbackFor = Exception.class)
     @Override
     public void cancelOrder(Long orderId, @Nullable String reason) {
-        orderRepository.findById(orderId).ifPresentOrElse(
-                order -> {
-                    switch (order.getStatus()) {
-                        case PENDING, AWAITING_PAYMENT, PAID -> {
-                            order.setStatus(OrderStatus.CANCELED);
-                            orderRepository.save(order);
-                            log.info("Order {} cancelled. Executing compensations...", orderId);
-                            executeCompensatingTransactions(order);
-                        }
-                        case CONFIRMED -> {
-                            order.setStatus(OrderStatus.CANCELLATION_PENDING);
-                            orderRepository.save(order);
-                            messagePublisher.publishOrderCanceled(
-                                    new OrderCancellationEvent(orderId),
-                                    UUID.randomUUID().toString(),
-                                    UUID.randomUUID().toString()
-                            );
-                        }
-                        case PREPARING, READY -> throw new IllegalStateException("Cannot cancel order in status: " + order.getStatus());
-                        case CANCELED, CANCELLATION_PENDING -> log.info("Order {} already cancelled", orderId);
-                    }
-                },
-                () -> {
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
-                }
-        );
+        CancelResult result = self.cancelOrderInDb(orderId);
+        Order order = result.order();
+        switch (result.previousStatus()) {
+            case PENDING, AWAITING_PAYMENT, PAID -> {
+                boolean paymentSucceeded = result.previousStatus() == OrderStatus.PAID;
+                log.info("Order {} cancelled. Executing compensations...", orderId);
+                executeCompensatingTransactions(order, paymentSucceeded);
+            }
+            case CONFIRMED -> {
+                messagePublisher.publishOrderCanceled(
+                        new OrderCancellationEvent(orderId),
+                        UUID.randomUUID().toString(),
+                        UUID.randomUUID().toString()
+                );
+            }
+            default -> {}
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public CancelResult cancelOrderInDb(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        
+        OrderStatus previousStatus = order.getStatus();
+        switch (previousStatus) {
+            case PENDING, AWAITING_PAYMENT, PAID -> {
+                order.setStatus(OrderStatus.CANCELED);
+                orderRepository.save(order);
+            }
+            case CONFIRMED -> {
+                order.setStatus(OrderStatus.CANCELLATION_PENDING);
+                orderRepository.save(order);
+            }
+            case PREPARING, READY -> throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot cancel order in status: " + previousStatus);
+            case CANCELED, CANCELLATION_PENDING -> log.info("Order {} already cancelled", orderId);
+        }
+        return new CancelResult(previousStatus, order);
     }
 
     @Transactional
@@ -310,7 +331,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<OrderResponse> getClientOrderHistory(Long clientId) {
-        return orderRepository.findByClientIdOrderByCreatedAtDesc(clientId)
+        return orderRepository.findDistinctByClientIdOrderByCreatedAtDesc(clientId)
                 .stream()
                 .map(orderMapper::toResponse)
                 .collect(Collectors.toList());
@@ -319,31 +340,31 @@ public class OrderServiceImpl implements OrderService {
     // --- Private helpers ---
 
     @Transactional
-    protected Order saveInitialOrder(Order order) {
+    public Order saveInitialOrder(Order order) {
         return orderRepository.save(order);
     }
 
     @Transactional
-    protected void updateOrderInDb(Order order) {
+    public void updateOrderInDb(Order order) {
         orderRepository.save(order);
     }
 
     @Transactional
-    protected void markOrderAsFailed(Long orderId) {
+    public void markOrderAsFailed(Long orderId) {
         orderRepository.findById(orderId).ifPresent(order -> {
             order.setStatus(OrderStatus.CANCELED);
             orderRepository.save(order);
         });
     }
 
-    private void executeCompensatingTransactions(Order order) {
+    private void executeCompensatingTransactions(Order order, boolean paymentSucceeded) {
         try {
             menuClient.rollbackStock(buildItemRequests(order));
         } catch (Exception e) {
             log.error("Failed to rollback stock for cancelled order {}", order.getId(), e);
         }
 
-        if (order.getStatus() == OrderStatus.PAID || order.getStripePaymentIntentId() != null) {
+        if (paymentSucceeded) {
             publishPaymentRefundEvent(order);
         }
 

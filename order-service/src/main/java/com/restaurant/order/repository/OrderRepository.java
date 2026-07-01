@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = "items")
-    List<Order> findByClientIdOrderByCreatedAtDesc(Long clientId);
+    List<Order> findDistinctByClientIdOrderByCreatedAtDesc(Long clientId);
 }

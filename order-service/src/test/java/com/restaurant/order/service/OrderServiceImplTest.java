@@ -126,4 +126,89 @@ class OrderServiceImplTest {
         assertEquals(OrderStatus.CONFIRMED, order.getStatus());
         verify(orderRepository).save(order);
     }
+
+    @Test
+    void transactionalHelpers_arePublicAndTransactional() throws NoSuchMethodException {
+        var saveInitialOrder = OrderServiceImpl.class.getMethod("saveInitialOrder", Order.class);
+        assertNotNull(saveInitialOrder.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+
+        var updateOrderInDb = OrderServiceImpl.class.getMethod("updateOrderInDb", Order.class);
+        assertNotNull(updateOrderInDb.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+
+        var markOrderAsFailed = OrderServiceImpl.class.getMethod("markOrderAsFailed", Long.class);
+        assertNotNull(markOrderAsFailed.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+
+        var cancelOrderInDb = OrderServiceImpl.class.getMethod("cancelOrderInDb", Long.class);
+        assertNotNull(cancelOrderInDb.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+
+        var processTicketCancellationSuccessInDb = OrderServiceImpl.class.getMethod("processTicketCancellationSuccessInDb", Long.class);
+        assertNotNull(processTicketCancellationSuccessInDb.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+    }
+
+    @Test
+    void markPointRedemptionSucceeded_isNotTransactional() throws NoSuchMethodException {
+        var method = OrderServiceImpl.class.getMethod("markPointRedemptionSucceeded", Long.class);
+        assertNull(method.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+    }
+
+    @Test
+    void cancelOrder_and_processTicketCancellationSuccess_areNotTransactional() throws NoSuchMethodException {
+        var cancelOrder = OrderServiceImpl.class.getMethod("cancelOrder", Long.class, String.class);
+        assertNull(cancelOrder.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+
+        var processTicketCancellationSuccess = OrderServiceImpl.class.getMethod("processTicketCancellationSuccess", Long.class);
+        assertNull(processTicketCancellationSuccess.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+    }
+
+    @Test
+    void cancelOrder_withPaidStatus_executesCompensationsWithPaymentSucceededTrue() {
+        Order order = Order.builder()
+                .id(20L)
+                .status(OrderStatus.PAID)
+                .discount(0)
+                .build();
+
+        when(orderRepository.findById(20L)).thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(20L, "User requested");
+
+        assertEquals(OrderStatus.CANCELED, order.getStatus());
+        verify(orderRepository).save(order);
+        verify(menuClient).rollbackStock(any());
+        verify(messagePublisher).publishPaymentRefund(any(), anyString(), anyString());
+    }
+
+    @Test
+    void cancelOrder_withAwaitingPaymentStatus_executesCompensationsWithPaymentSucceededFalse() {
+        Order order = Order.builder()
+                .id(20L)
+                .status(OrderStatus.AWAITING_PAYMENT)
+                .discount(0)
+                .build();
+
+        when(orderRepository.findById(20L)).thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(20L, "User requested");
+
+        assertEquals(OrderStatus.CANCELED, order.getStatus());
+        verify(orderRepository).save(order);
+        verify(menuClient).rollbackStock(any());
+        verify(messagePublisher, never()).publishPaymentRefund(any(), anyString(), anyString());
+    }
+
+    @Test
+    void cancelOrder_withPreparingStatus_throwsConflictResponseStatusException() {
+        Order order = Order.builder()
+                .id(30L)
+                .status(OrderStatus.PREPARING)
+                .build();
+
+        when(orderRepository.findById(30L)).thenReturn(Optional.of(order));
+
+        var ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> orderService.cancelOrder(30L, "User requested")
+        );
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatusCode());
+    }
 }
