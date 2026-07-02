@@ -4,6 +4,7 @@ import com.restaurant.auth.config.RabbitMQConfig;
 import com.restaurant.auth.config.SecurityUser;
 import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
+import com.restaurant.auth.dto.AdminSignupRequest;
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
@@ -120,6 +121,55 @@ class AuthServiceTest {
 
         verify(userRepository, never()).save(any());
         verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+    }
+
+    // ── signupAdmin ──────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("signupAdmin() returns a message and persists ADMIN role")
+    void signupAdmin_success_returnsMessage() {
+        AdminSignupRequest request = new AdminSignupRequest("admin@example.com", "password123", "Admin", "User");
+
+        given(userRepository.existsByEmail("admin@example.com")).willReturn(false);
+        given(passwordEncoder.encode("password123")).willReturn("$2a$hashed");
+        
+        User savedAdmin = User.builder()
+                .id(2L)
+                .email("admin@example.com")
+                .password("$2a$hashed")
+                .firstName("Admin")
+                .lastName("User")
+                .role(Role.ADMIN)
+                .isActive(true)
+                .build();
+                
+        given(userRepository.save(any(User.class))).willReturn(savedAdmin);
+
+        MessageResponse response = authService.signupAdmin(request);
+
+        assertThat(response.message()).isEqualTo("Admin registered successfully.");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getEmail()).isEqualTo("admin@example.com");
+        assertThat(userCaptor.getValue().getPassword()).isEqualTo("$2a$hashed");
+        assertThat(userCaptor.getValue().getFirstName()).isEqualTo("Admin");
+        assertThat(userCaptor.getValue().getLastName()).isEqualTo("User");
+        assertThat(userCaptor.getValue().getRole()).isEqualTo(Role.ADMIN);
+        assertThat(userCaptor.getValue().getIsActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("signupAdmin() throws EmailAlreadyExistsException when email is taken")
+    void signupAdmin_duplicateEmail_throwsException() {
+        AdminSignupRequest request = new AdminSignupRequest("admin@example.com", "password123", "Admin", "User");
+        given(userRepository.existsByEmail("admin@example.com")).willReturn(true);
+
+        assertThatThrownBy(() -> authService.signupAdmin(request))
+                .isInstanceOf(EmailAlreadyExistsException.class)
+                .hasMessageContaining("admin@example.com");
+
+        verify(userRepository, never()).save(any());
     }
 
     // ── login ─────────────────────────────────────────────────────────────────
