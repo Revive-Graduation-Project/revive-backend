@@ -59,6 +59,11 @@ app:
         routing-key: order.created
         dlq-name: order.created.queue.dlq
         dlq-routing-key: order.created.dlq
+      order-canceled:
+        name: order.canceled.queue
+        routing-key: order.canceled
+        dlq-name: order.canceled.queue.dlq
+        dlq-routing-key: order.canceled.dlq
 
 
 # ─────────────────────────────────────────────────────────────────────────────
