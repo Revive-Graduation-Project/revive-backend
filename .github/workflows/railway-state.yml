@@ -15,6 +15,10 @@ on:
     - cron: "0 21 * * *"
     - cron: "0 12 * * *"
 
+env:
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  PROJECT_ID: 87bbe249-a193-417a-8537-8f0a8eefe7d3
+
 jobs:
   manage-railway:
     runs-on: ubuntu-latest
@@ -25,18 +29,38 @@ jobs:
       - name: Install Railway CLI
         run: npm i -g @railway/cli
 
-      - name: Railway Down
+      - name: Get all service IDs
+        id: services
+        run: |
+          SERVICES=$(curl -s https://backboard.railway.com/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"{ project(id: \"'$PROJECT_ID'\") { services { edges { node { id name } } } } }"}' \
+            | jq -r '.data.project.services.edges[].node.id')
+          echo "ids<<EOF" >> $GITHUB_OUTPUT
+          echo "$SERVICES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Railway Down (all services)
         if: >-
           github.event.inputs.action == 'down' ||
           github.event.schedule == '0 21 * * *'
-        run: railway down --yes
+        run: |
+          echo "${{ steps.services.outputs.ids }}" | while read -r SERVICE_ID; do
+            echo "Stopping service: $SERVICE_ID"
+            railway down --yes --service "$SERVICE_ID"
+          done
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ env.PROJECT_ID }}
 
-      - name: Railway Up
+      - name: Railway Up (all services)
         if: >-
           github.event.inputs.action == 'up' ||
           github.event.schedule == '0 12 * * *'
-        run: railway up --detach
+        run: |
+          echo "${{ steps.services.outputs.ids }}" | while read -r SERVICE_ID; do
+            echo "Starting service: $SERVICE_ID"
+            railway up --detach --service "$SERVICE_ID"
+          done
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ env.PROJECT_ID }}
