@@ -21,7 +21,16 @@ app:
       user-created:
         name: user.created.queue
         routing-key: user.created
-
         dlq-name: user.created.queue.dlq
         dlq-routing-key: user.created.dlq
+      order-created:
+        name: order.created.queue
+        routing-key: order.created
+        dlq-name: order.created.queue.dlq
+        dlq-routing-key: order.created.dlq
+      order-canceled:
+        name: order.canceled.queue
+        routing-key: order.canceled
+        dlq-name: order.canceled.queue.dlq
+        dlq-routing-key: order.canceled.dlq
 

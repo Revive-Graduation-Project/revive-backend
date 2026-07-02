@@ -1,8 +1,10 @@
 package com.restaurant.kitchen.messaging;
 
+import com.restaurant.kitchen.events.OrderCanceledEvent;
 import com.restaurant.kitchen.events.OrderCreatedEvent;
 import com.restaurant.kitchen.events.chefProfileEvents.ProfileCreationFailedEvent;
 import com.restaurant.kitchen.events.UserCreatedEvent;
+import com.restaurant.kitchen.events.ticketEvents.TicketCanceledFailedEvent;
 import com.restaurant.kitchen.events.ticketEvents.TicketCreationFailedEvent;
 import com.restaurant.kitchen.service.ChefService;
 import com.restaurant.kitchen.service.TicketService;
@@ -28,10 +30,6 @@ public class MessageListener {
                               @Header(value = "correlationId", required = false) String correlationId,
                               @Header(value = "sagaId", required = false) String sagaId) {
 
-        if (sagaId == null || correlationId == null) {
-            log.error("Missing required headers on user.created event, discarding message, event: {}", event);
-            return;  // discard — No requeue
-        }
         chefService.createChefProfile(event, correlationId, sagaId);
     }
 
@@ -62,15 +60,12 @@ public class MessageListener {
         }
     }
 
+
     @RabbitListener(queues = "${app.rabbitmq.queues.order-created.name}")
     public void onOrderCreated(OrderCreatedEvent event,
                                @Header(value = "correlationId", required = false) String correlationId,
                                @Header(value = "sagaId", required = false) String sagaId) {
 
-        if (sagaId == null || correlationId == null) {
-            log.error("Missing required headers on order.created event, discarding message, event: {}", event);
-            return;  // discard — No requeue
-        }
         ticketService.createKitchenTicket(event, correlationId, sagaId);
     }
 
@@ -98,6 +93,38 @@ public class MessageListener {
 
             // By not throwing an exception here, we effectively ACK the message.
             // It leaves the queue (preventing a loop), but the data is safe in LOGS.
+        }
+    }
+    @RabbitListener(queues = "${app.rabbitmq.queues.order-canceled.name}")
+    public void onOrderCancelled(OrderCanceledEvent event,
+                                 @Header(value = "sagaId" , required = false) String sagaId,
+                                 @Header(value = "correlationId" , required = false) String correlationId) {
+
+        ticketService.cancelKitchenTicket(event.getId(), sagaId, correlationId);
+    }
+
+    @RabbitListener(queues = "${app.rabbitmq.queues.order-canceled.dlq-name}")
+    public void onOrderCancelledFailure(OrderCanceledEvent event,
+                                        @Header("sagaId") String sagaId,
+                                        @Header("correlationId") String correlationId) {
+
+        log.error("Message moved to DLQ after max retries. Sending final failure event for order: {}", event.getId());
+
+        try {
+
+            TicketCanceledFailedEvent failedEvent = new TicketCanceledFailedEvent(
+                    event.getId(),
+                    "Kitchen ticket creation failed due to technical error after multiple retries"
+            );
+            publisher.publishTicketCancellationFailure(failedEvent, sagaId, correlationId);
+
+        } catch (Exception e) {
+
+            // handle failed event publish failure
+            log.error("CRITICAL: DLQ Processing failed for Saga: {}. " +
+                            "Manual intervention required! Event Data: {}",
+                    sagaId, event, e);
+
         }
     }
 }

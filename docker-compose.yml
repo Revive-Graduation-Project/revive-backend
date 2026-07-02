@@ -261,6 +261,8 @@ services:
     depends_on:
       inventory-db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - restaurant-net
 
@@ -283,6 +285,8 @@ services:
       SUPABASE_MEAL_BUCKET: ${SUPABASE_MEAL_BUCKET:-meal-photos-dev}
     depends_on:
       menu-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - restaurant-net

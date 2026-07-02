@@ -12,6 +12,8 @@ spring:
 
   cloud:
     gateway:
+      routes:
+        - id: auth-service
       httpclient:
         max-request-size: 5MB
       # ── Global CORS — lets browsers talk to the gateway ────────────
@@ -127,10 +129,17 @@ spring:
     gateway:
       routes:
         - id: auth-service
+>>>>>>> origin/dev
           uri: http://auth-service:8080
           predicates:
             - Path=/auth/**
 
+        - id: auth-service
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/auth/**
+
+        # ── Menu Management Service (menu + ingredients) ───────────────
         - id: menu-service-menu
           uri: http://menu-management-service:8080
           predicates:
@@ -141,26 +150,31 @@ spring:
           predicates:
             - Path=/api/ingredients/**
 
+        # ── Kitchen Service ────────────────────────────────────────────
         - id: kitchen-service
           uri: http://kitchen-service:8080
           predicates:
             - Path=/api/kitchen/**
 
+        # ── Inventory Service ──────────────────────────────────────────
         - id: inventory-service
           uri: http://inventory-service:8080
           predicates:
             - Path=/api/inventory/**
 
+        # ── Order Service ──────────────────────────────────────────────
         - id: order-service
           uri: http://order-service:8080
           predicates:
             - Path=/api/orders/**
 
+        # ── Client Service ─────────────────────────────────────────────
         - id: client-service
           uri: http://client-service:8080
           predicates:
             - Path=/api/clients/**
 
+        # ── Payment Service ────────────────────────────────────────────
         - id: payment-service
           uri: http://payment-service:8080
           predicates:
@@ -221,8 +235,9 @@ spring:
 server:
   port: ${PORT:8080}
 
+>>>>>>> origin/dev
 management:
   endpoints:
     web:
       exposure:
-        exclude: "*"
+        include: health

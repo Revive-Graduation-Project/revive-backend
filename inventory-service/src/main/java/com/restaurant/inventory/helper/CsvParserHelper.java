@@ -91,7 +91,6 @@ public class CsvParserHelper {
                 log.warn("Skipping row with missing meal_name");
                 continue;
             }
-
             String category = row.getOrDefault("category", "Uncategorized");
             String priceRaw = row.getOrDefault("price", "0");
             String description = row.getOrDefault("description", "");

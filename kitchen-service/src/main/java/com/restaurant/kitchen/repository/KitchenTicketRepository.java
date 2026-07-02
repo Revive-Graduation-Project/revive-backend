@@ -11,6 +11,6 @@ import java.util.Optional;
 @Repository
 public interface KitchenTicketRepository extends JpaRepository<KitchenTicket, Long> {
 
-   List<KitchenTicket> findByStatusNot(TicketStatus status); // search for active tickets
    Optional<KitchenTicket> findByOrderId(Long orderId);
+   List<KitchenTicket> findByStatusIn(List<TicketStatus> statuses);
 }

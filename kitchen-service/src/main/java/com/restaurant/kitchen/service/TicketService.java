@@ -13,4 +13,6 @@ public interface TicketService {
     List<KitchenTicketDTO> getActiveTickets();
 
     KitchenTicketDTO updateTicketStatus(Long id, TicketStatus status);
+
+    void cancelKitchenTicket(Long id, String sagaId, String correlationId);
 }
