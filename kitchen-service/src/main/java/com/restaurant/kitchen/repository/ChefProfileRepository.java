@@ -19,15 +19,15 @@ public interface ChefProfileRepository extends JpaRepository<ChefProfile, Long> 
     Optional<ChefProfile> findByAuthUserId(Long authUserId);
 
     @Query("""
-        SELECT c FROM ChefProfile c
-        LEFT JOIN c.assignedTickets t ON t.status = :ticketStatus
-        WHERE c.status = :chefStatus
-        GROUP BY c
-        ORDER BY COUNT(t) ASC
-    """)
+                SELECT c FROM ChefProfile c
+                LEFT JOIN c.assignedTickets t ON t.status IN (:activeStatuses)
+                WHERE c.status = :chefStatus
+                GROUP BY c
+                ORDER BY COUNT(t) ASC
+            """)
     List<ChefProfile> findMostAvailableActiveChefs(
             @Param("chefStatus") ChefStatus chefStatus,
-            @Param("ticketStatus") TicketStatus ticketStatus,
+            @Param("activeStatuses") List<TicketStatus> activeStatuses,
             Pageable pageable
     );
 }

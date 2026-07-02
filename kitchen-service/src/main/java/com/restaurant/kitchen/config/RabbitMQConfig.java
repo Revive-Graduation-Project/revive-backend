@@ -41,6 +41,19 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.queues.order-created.dlq-routing-key}")
     private String orderCreatedDLQRoutingKey;
 
+    // order.canceled
+    @Value("${app.rabbitmq.queues.order-canceled.name}")
+    private String orderCanceledQueue;
+
+    @Value("${app.rabbitmq.queues.order-canceled.routing-key}")
+    private String orderCanceledRoutingKey;
+
+    @Value("${app.rabbitmq.queues.order-canceled.dlq-name}")
+    private String orderCanceledDLQName;
+
+    @Value("${app.rabbitmq.queues.order-canceled.dlq-routing-key}")
+    private String orderCanceledDLQRoutingKey;
+
     // --------- Converter ----------
     @Bean
     public MessageConverter converter() {
@@ -90,6 +103,19 @@ public class RabbitMQConfig {
         return new Queue(orderCreatedDLQName, true);
     }
 
+    @Bean
+    public Queue orderCanceledQueue() {
+        return QueueBuilder.durable(orderCanceledQueue)
+                .withArgument("x-dead-letter-exchange", exchange)
+                .withArgument("x-dead-letter-routing-key", orderCanceledDLQRoutingKey)
+                .build();
+    }
+
+    @Bean
+    public Queue orderCanceledDLQ() {
+        return new Queue(orderCanceledDLQName, true);
+    }
+
     // --------- Bindings ----------
     @Bean
     public Binding bindingUserCreatedQueue() {
@@ -121,5 +147,21 @@ public class RabbitMQConfig {
                 .bind(orderCreatedDLQ())
                 .to(restaurantExchange())
                 .with(orderCreatedDLQRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingOrderCanceledQueue() {
+        return BindingBuilder
+                .bind(orderCanceledQueue())
+                .to(restaurantExchange())
+                .with(orderCanceledRoutingKey);
+    }
+
+    @Bean
+    public Binding bindingOrderCanceledDLQ() {
+        return BindingBuilder
+                .bind(orderCanceledDLQ())
+                .to(restaurantExchange())
+                .with(orderCanceledDLQRoutingKey);
     }
 }
