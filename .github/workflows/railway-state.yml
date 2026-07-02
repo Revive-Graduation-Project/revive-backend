@@ -17,7 +17,6 @@ on:
 
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-  PROJECT_ID: 87bbe249-a193-417a-8537-8f0a8eefe7d3
 
 jobs:
   manage-railway:
@@ -29,41 +28,44 @@ jobs:
       - name: Install Railway CLI
         run: npm i -g @railway/cli
 
-      - name: Get all service IDs
-        id: services
-        run: |
-          RESPONSE=$(curl -s https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\":\"{ project(id: \\\"$PROJECT_ID\\\") { services { edges { node { id name } } } } }\"}")
-          echo "API Response: $RESPONSE"
-          SERVICES=$(echo "$RESPONSE" | jq -r '.data.project.services.edges[].node | "\(.id) \(.name)"')
-          echo "$SERVICES"
-          IDS=$(echo "$RESPONSE" | jq -r '.data.project.services.edges[].node.id')
-          echo "ids<<EOF" >> $GITHUB_OUTPUT
-          echo "$IDS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Railway Down (all services)
         if: >-
           github.event.inputs.action == 'down' ||
           github.event.schedule == '0 21 * * *'
+        env:
+          RAILWAY_PROJECT_ID: 87bbe249-a193-417a-8537-8f0a8eefe7d3
         run: |
-          echo "${{ steps.services.outputs.ids }}" | while read -r SERVICE_ID; do
+          SERVICES=(
+            "081b6e9c-6318-4606-b486-ccbd887bd41e"  # menu-management-service
+            "0b5a864c-1c4f-453d-93e9-f42a8c03155b"  # client-service
+            "0c0ad687-2498-468e-853b-ef7860e7a719"  # gateway-service
+            "0e5be657-2858-4814-b86c-5415753c2685"  # order-service
+            "416943cd-6781-4e0f-9c9a-6938b32543e1"  # inventory-service
+            "6c8e28b4-ae20-4568-bc2e-79ce840d4d11"  # kitchen-service
+            "f5063b77-2d00-414d-9503-ca997fdbe605"  # auth-service
+          )
+          for SERVICE_ID in "${SERVICES[@]}"; do
             echo "Stopping service: $SERVICE_ID"
             railway down --yes --service "$SERVICE_ID"
           done
-        env:
-          RAILWAY_PROJECT_ID: ${{ env.PROJECT_ID }}
 
       - name: Railway Up (all services)
         if: >-
           github.event.inputs.action == 'up' ||
           github.event.schedule == '0 12 * * *'
+        env:
+          RAILWAY_PROJECT_ID: 87bbe249-a193-417a-8537-8f0a8eefe7d3
         run: |
-          echo "${{ steps.services.outputs.ids }}" | while read -r SERVICE_ID; do
+          SERVICES=(
+            "081b6e9c-6318-4606-b486-ccbd887bd41e"  # menu-management-service
+            "0b5a864c-1c4f-453d-93e9-f42a8c03155b"  # client-service
+            "0c0ad687-2498-468e-853b-ef7860e7a719"  # gateway-service
+            "0e5be657-2858-4814-b86c-5415753c2685"  # order-service
+            "416943cd-6781-4e0f-9c9a-6938b32543e1"  # inventory-service
+            "6c8e28b4-ae20-4568-bc2e-79ce840d4d11"  # kitchen-service
+            "f5063b77-2d00-414d-9503-ca997fdbe605"  # auth-service
+          )
+          for SERVICE_ID in "${SERVICES[@]}"; do
             echo "Starting service: $SERVICE_ID"
             railway up --detach --service "$SERVICE_ID"
           done
-        env:
-          RAILWAY_PROJECT_ID: ${{ env.PROJECT_ID }}
