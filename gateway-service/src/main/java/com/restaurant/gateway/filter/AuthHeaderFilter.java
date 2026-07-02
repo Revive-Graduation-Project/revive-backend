@@ -33,6 +33,7 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/auth/login",
             "/auth/signup",
+            "/auth/refresh",
             "/actuator/health",
             "/v3/api-docs",
             "/auth/v3/api-docs",
