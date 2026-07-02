@@ -3,6 +3,7 @@ package com.restaurant.auth.service;
 import com.restaurant.auth.config.RabbitMQConfig;
 import com.restaurant.auth.domain.entity.User;
 import com.restaurant.auth.domain.enums.Role;
+import com.restaurant.auth.dto.AdminSignupRequest;
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
@@ -155,6 +156,30 @@ public class AuthService {
 
                 // 6. Return a success message
                 return new MessageResponse("Staff user registered successfully.");
+        }
+
+        @Transactional
+        public MessageResponse signupAdmin(AdminSignupRequest request) {
+                // 1. Guard: reject duplicate emails
+                if (userRepository.existsByEmail(request.email())) {
+                        throw new EmailAlreadyExistsException(request.email());
+                }
+
+                // 2. Persist the new admin user with a hashed password
+                User user = User.builder()
+                                .email(request.email())
+                                .password(passwordEncoder.encode(request.password()))
+                                .firstName(request.firstName())
+                                .lastName(request.lastName())
+                                .role(Role.ADMIN)
+                                .isActive(true)
+                                .build();
+
+                User savedUser = userRepository.save(user);
+                log.info("Admin user created: id={}", savedUser.getId());
+
+                // 3. Return a success message
+                return new MessageResponse("Admin registered successfully.");
         }
 
         void publishUserCreatedEvent(User savedUser, UserCreatedEvent event) {

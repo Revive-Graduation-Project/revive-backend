@@ -1,5 +1,6 @@
 package com.restaurant.auth.controller;
 
+import com.restaurant.auth.dto.AdminSignupRequest;
 import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthResponse;
 import com.restaurant.auth.dto.AuthTokenPair;
@@ -43,6 +44,16 @@ public class AuthController {
     @PostMapping("/staff/signup")
     public ResponseEntity<MessageResponse> signupStaff(@Valid @RequestBody StaffSignupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.signupStaff(request));
+    }
+
+    /**
+     * Registers a new ADMIN member.
+     * Only accessible to existing ADMIN roles.
+     */
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/admin/signup")
+    public ResponseEntity<MessageResponse> signupAdmin(@Valid @RequestBody AdminSignupRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.signupAdmin(request));
     }
 
     /**
