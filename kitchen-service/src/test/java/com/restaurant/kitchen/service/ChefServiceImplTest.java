@@ -18,6 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -35,6 +40,20 @@ class ChefServiceImplTest {
 
     @InjectMocks
     private ChefServiceImpl chefService;
+
+    @BeforeEach
+    void setUp() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.initSynchronization();
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clear();
+        }
+    }
 
     // ── updateDisplayName ────────────────────────────────────────────────
 
@@ -161,6 +180,10 @@ class ChefServiceImplTest {
 
         chefService.createChefProfile(event, "corr-001", "saga-001");
 
+        for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+            sync.afterCommit();
+        }
+
         verify(chefProfileRepository, never()).save(any());
         verify(publisher).publishChefCreated(any(), eq("saga-001"), eq("corr-001"));
     }
@@ -176,6 +199,10 @@ class ChefServiceImplTest {
         when(chefProfileRepository.findByAuthUserId(1L)).thenReturn(Optional.empty());
 
         chefService.createChefProfile(event, "corr-001", "saga-001");
+
+        for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+            sync.afterCommit();
+        }
 
         verify(chefProfileRepository).save(any(ChefProfile.class));
         verify(publisher).publishChefCreated(any(), eq("saga-001"), eq("corr-001"));
