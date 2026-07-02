@@ -45,6 +45,6 @@ FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
-ENV JAVA_OPTS="-Xss4m"
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=60.0 -XX:+UseG1GC -Xss256k -XX:MetaspaceSize=64m -XX:MaxMetaspaceSize=128m"
 ENV SPRING_PROFILES_ACTIVE=dev
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
