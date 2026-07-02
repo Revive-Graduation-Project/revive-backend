@@ -78,29 +78,22 @@ public class CsvParserHelper {
         List<Map<String, String>> rows = parse(file);
         LinkedHashMap<String, MealCsvEntry> menuMap = new LinkedHashMap<>();
 
+        if (rows.isEmpty()) {
+            return menuMap;
+        }
+
+        // Detect format: Check if the first row has "ingredients" column
+        boolean isListFormat = rows.get(0).containsKey("ingredients");
+
         for (Map<String, String> row : rows) {
             String mealName = row.get("meal_name");
-            String ingredient = row.get("ingredient");
-            String quantityRaw = row.get("quantity");
-            String unit = row.get("unit");
-            String category = row.getOrDefault("category", "Uncategorized");
-            String priceRaw = row.getOrDefault("price", "0");
-
             if (mealName == null || mealName.isBlank()) {
                 log.warn("Skipping row with missing meal_name");
                 continue;
             }
-            if (ingredient == null || ingredient.isBlank()) {
-                log.warn("Skipping row with missing ingredient for meal '{}'", mealName);
-                continue;
-            }
-
-            double quantity = 0;
-            try {
-                quantity = Double.parseDouble(quantityRaw.trim());
-            } catch (Exception e) {
-                log.warn("Invalid quantity '{}' for ingredient '{}', defaulting to 0", quantityRaw, ingredient);
-            }
+            String category = row.getOrDefault("category", "Uncategorized");
+            String priceRaw = row.getOrDefault("price", "0");
+            String description = row.getOrDefault("description", "");
 
             double price = 0;
             try {
@@ -109,25 +102,88 @@ public class CsvParserHelper {
                 log.warn("Invalid price '{}' for meal '{}', defaulting to 0", priceRaw, mealName);
             }
 
-            IngredientEntry entry = new IngredientEntry(
-                    ingredient.trim(),
-                    quantity,
-                    unit == null ? "" : unit.trim());
+            if (isListFormat) {
+                String ingredientsRaw = row.get("ingredients");
+                List<IngredientEntry> ingredients = parseIngredientsList(ingredientsRaw);
+                menuMap.put(mealName.trim(), new MealCsvEntry(ingredients, category.trim(), price, description.trim()));
+            } else {
+                String ingredient = row.get("ingredient");
+                String quantityRaw = row.get("quantity");
+                String unit = row.get("unit");
 
-            double finalPrice = price;
-            MealCsvEntry mealEntry = menuMap.computeIfAbsent(mealName, k ->
-                    new MealCsvEntry(new ArrayList<>(), category.trim(), finalPrice));
-            mealEntry.ingredients().add(entry);
+                if (ingredient == null || ingredient.isBlank()) {
+                    log.warn("Skipping row with missing ingredient for meal '{}'", mealName);
+                    continue;
+                }
+
+                double quantity = 0;
+                try {
+                    quantity = Double.parseDouble(quantityRaw.trim());
+                } catch (Exception e) {
+                    log.warn("Invalid quantity '{}' for ingredient '{}', defaulting to 0", quantityRaw, ingredient);
+                }
+
+                IngredientEntry entry = new IngredientEntry(
+                        ingredient.trim(),
+                        quantity,
+                        unit == null ? "" : unit.trim());
+
+                double finalPrice = price;
+                MealCsvEntry mealEntry = menuMap.computeIfAbsent(mealName, k ->
+                        new MealCsvEntry(new ArrayList<>(), category.trim(), finalPrice, description.trim()));
+                mealEntry.ingredients().add(entry);
+            }
         }
 
         log.debug("CsvParserHelper: parsed {} meals from CSV", menuMap.size());
         return menuMap;
     }
 
+    private List<IngredientEntry> parseIngredientsList(String ingredientsRaw) {
+        List<IngredientEntry> list = new ArrayList<>();
+        if (ingredientsRaw == null || ingredientsRaw.isBlank()) {
+            return list;
+        }
+
+        // Split by semicolon
+        String[] parts = ingredientsRaw.split(";");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.isEmpty()) continue;
+
+            String name = part;
+            double quantity = 0;
+            String unit = "";
+
+            if (part.contains(":")) {
+                int colonIdx = part.lastIndexOf(':');
+                name = part.substring(0, colonIdx).trim();
+                String qtyUnitStr = part.substring(colonIdx + 1).trim();
+
+                // Parse numeric prefix and unit (e.g. "150 g" or "150g" or "1.5 kg")
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^([0-9.]+)\\s*(.*)$");
+                java.util.regex.Matcher matcher = pattern.matcher(qtyUnitStr);
+                if (matcher.matches()) {
+                    try {
+                        quantity = Double.parseDouble(matcher.group(1));
+                    } catch (NumberFormatException e) {
+                        log.warn("Failed to parse quantity from '{}'", qtyUnitStr);
+                    }
+                    unit = matcher.group(2).trim();
+                }
+            } else {
+                log.warn("Ingredient entry '{}' does not contain quantity colon (:), defaulting quantity to 0", part);
+            }
+
+            list.add(new IngredientEntry(name, quantity, unit));
+        }
+        return list;
+    }
+
     /**
      * Holds the parsed CSV data for a single meal.
      */
-    public record MealCsvEntry(List<IngredientEntry> ingredients, String category, double price) {
+    public record MealCsvEntry(List<IngredientEntry> ingredients, String category, double price, String description) {
     }
 
     public void validateFile(MultipartFile file) {

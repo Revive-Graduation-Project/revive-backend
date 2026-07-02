@@ -1,0 +1,124 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  PAYMENT-SERVICE — Multi-Environment Configuration                        ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+spring:
+  application:
+    name: payment-service
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8088
+
+springdoc:
+  api-docs:
+    path: /api/payments/v3/api-docs
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      payment-refund:
+        name: payment.refund.queue
+        routing-key: payment.refund
+    outbound:
+      payment-succeeded: payment.succeeded
+      payment-failed: payment.failed
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: jdbc:postgresql://localhost:5437/payment_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:postgresql://payment-db:5432/payment_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+server:
+  port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+#  NOTE: Update the Neon DB URL below once the database is created.
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://ep-divine-mode-alfmrpgy-pooler.c-3.eu-central-1.aws.neon.tech/payment_db?sslmode=require&channel_binding=require
+    username: neondb_owner
+    password: npg_tHN2wIgpPo6E
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: amqps://jpndmhye:pPZzD9atkwLkSBQwt6bCBV-ATQrBzxCf@seal.lmq.cloudamqp.com/jpndmhye
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

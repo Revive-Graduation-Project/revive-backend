@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -47,9 +49,14 @@ public class ChefServiceImpl implements ChefService {
 
             log.info("Chef already exists, re-publishing creation event. userId: {}", event.getId());
 
-            publisher.publishChefCreated(
-                    new ProfileCreatedEvent(event.getId()),
-                    sagaId, correlationId);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publisher.publishChefCreated(
+                            new ProfileCreatedEvent(event.getId()),
+                            sagaId, correlationId);
+                }
+            });
 
             return; //spring Ack the message automatically since it did not throw an exception
         }
@@ -59,14 +66,17 @@ public class ChefServiceImpl implements ChefService {
               chefProfileRepository.save(
                      ChefProfile.builder()
                              .authUserId(event.getId())
-                             .station(Station.UNASSIGNED)
-                             .displayName("Unassigned")
-                             .status(ChefStatus.INACTIVE)
+                             .displayName(event.getFirstName() + " " + event.getLastName())
                              .build()
             );
-            publisher.publishChefCreated(
-                    new ProfileCreatedEvent(event.getId()),
-                    sagaId, correlationId);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publisher.publishChefCreated(
+                            new ProfileCreatedEvent(event.getId()),
+                            sagaId, correlationId);
+                }
+            });
 
         } catch (Exception exception) {
             log.error("Chef profile creation failed", exception); // due to publish failure or save failure

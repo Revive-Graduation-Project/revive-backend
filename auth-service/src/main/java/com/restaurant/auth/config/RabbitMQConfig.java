@@ -17,8 +17,13 @@ public class RabbitMQConfig {
     // ── Exchange names & routing keys (constants for easy reuse) ─────────────
     public static final String EXCHANGE_NAME = "restaurant.events.exchange";
     public static final String ROUTING_KEY_CREATED = "user.created";
+    public static final String ROUTING_KEY_CLIENT_CREATED = "user.created.client";
+    public static final String ROUTING_KEY_CHEF_CREATED = "user.created.chef";
     public static final String COMPENSATION_QUEUE = "auth.compensation.queue";
     public static final String COMPENSATION_KEY = "chef.profile.failed";
+
+    public static final String CLIENT_COMPENSATION_QUEUE = "client.profile.failed.queue";
+    public static final String CLIENT_COMPENSATION_KEY = "client.profile.failed";
 
     // ── Exchange ──────────────────────────────────────────────────────────────
 
@@ -42,21 +47,45 @@ public class RabbitMQConfig {
         return new Queue(COMPENSATION_QUEUE, true); // durable=true
     }
 
+    @Bean
+    public Queue clientCompensationQueue() {
+        return new Queue(CLIENT_COMPENSATION_QUEUE, true);
+    }
+
     // ── Binding ───────────────────────────────────────────────────────────────
 
     @Bean
     public Binding compensationBinding(Queue authCompensationQueue,
             TopicExchange restaurantEventsExchange) {
         return BindingBuilder.bind(authCompensationQueue)
-                .to(restaurantEventsExchange)
-                .with(COMPENSATION_KEY);
+                 .to(restaurantEventsExchange)
+                 .with(COMPENSATION_KEY);
     }
+
+    @Bean
+    public Binding clientCompensationBinding(Queue clientCompensationQueue,
+            TopicExchange restaurantEventsExchange) {
+        return BindingBuilder.bind(clientCompensationQueue)
+                 .to(restaurantEventsExchange)
+                 .with(CLIENT_COMPENSATION_KEY);
+    }
+
 
     // ── Message converter (JSON via Jackson) ──────────────────────────────────
 
     @Bean
     public MessageConverter messageConverter() {
-        return new Jackson2JsonMessageConverter();
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+        org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper typeMapper = new org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper();
+        typeMapper.setTrustedPackages("*");
+        
+        java.util.Map<String, Class<?>> idClassMapping = new java.util.HashMap<>();
+        idClassMapping.put("com.restaurant.client.event.ProfileCreationFailedEvent", com.restaurant.auth.event.ProfileCreationFailedEvent.class);
+        idClassMapping.put("com.restaurant.kitchen.event.ProfileCreationFailedEvent", com.restaurant.auth.event.ProfileCreationFailedEvent.class);
+        typeMapper.setIdClassMapping(idClassMapping);
+        
+        converter.setJavaTypeMapper(typeMapper);
+        return converter;
     }
 
     @Bean

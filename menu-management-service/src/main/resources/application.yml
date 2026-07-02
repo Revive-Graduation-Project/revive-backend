@@ -1,12 +1,19 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  MENU-MANAGEMENT-SERVICE — Multi-Environment Configuration                 ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: menu-management-service
 
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:menu-db}:${DB_PORT:5432}/menu_db
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
   jpa:
     hibernate:
@@ -17,24 +24,19 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-    listener:
-      simple:
-        retry:
-          enabled: true
-          max-attempts: 3
-          initial-interval: 2000ms
-          multiplier: 2.0
-          max-interval: 10000ms
-        default-requeue-rejected: false
-
 server:
-  port: 8080
+  port: 8084
 
+supabase:
+  url: ${SUPABASE_URL:}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+  bucket: ${SUPABASE_MEAL_BUCKET:meal-photos}
+
+springdoc:
+  api-docs:
+    path: /api/menu/v3/api-docs
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
   rabbitmq:
     exchange: restaurant.events.exchange
@@ -44,3 +46,83 @@ app:
         routing-key: menu.nutrition.processed
         dlq-name: menu.nutrition.processed.queue.dlq
         dlq-routing-key: menu.nutrition.processed.dlq
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: ${MENU_DB_URL:jdbc:postgresql://localhost:5434/menu_db}
+    username: ${MENU_DB_USERNAME:postgres}
+    password: ${MENU_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${MENU_DB_URL:jdbc:postgresql://menu-db:5432/menu_db}
+    username: ${MENU_DB_USERNAME:postgres}
+    password: ${MENU_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${MENU_DB_URL:${MENU_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${MENU_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${MENU_DB_PASSWORD:${PROD_DB_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

@@ -10,5 +10,6 @@ import java.util.List;
 public interface ChefProfileMapper {
 
     ChefProfileDTO toDTO(ChefProfile chefProfile);
+
     List<ChefProfileDTO> toDTOList(List<ChefProfile> chefs);
 }

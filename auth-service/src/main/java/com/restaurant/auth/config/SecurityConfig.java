@@ -5,7 +5,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -20,22 +19,27 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final ApplicationConfig applicationConfig;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
+    public SecurityConfig(JwtService jwtService,
+            UserDetailsService userDetailsService,
             ApplicationConfig applicationConfig) {
-        this.jwtAuthFilter = jwtAuthFilter;
+        // Manually create the filter — NOT a @Component, so Spring won't
+        // auto-register it as a global servlet filter.
+        this.jwtAuthFilter = new JwtAuthenticationFilter(jwtService, userDetailsService);
         this.applicationConfig = applicationConfig;
     }
 
@@ -52,12 +56,14 @@ public class SecurityConfig {
                 // Authorisation rules
                 .authorizeHttpRequests(auth -> auth
                         // 1. Your public auth endpoints
-                        .requestMatchers("/auth/signup", "/auth/login").permitAll()
+                        .requestMatchers("/auth/signup", "/auth/login", "/auth/refresh").permitAll()
 
                         // 2. Swagger UI and OpenAPI docs (Safe for public viewing)
                         .requestMatchers(
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
+                                "/auth/v3/api-docs",
+                                "/auth/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/index.html")
@@ -78,24 +84,21 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer webSecurityCustomizer() {
-        return (web) -> web.ignoring().requestMatchers(
-                "/v3/api-docs/**",
-                "/v3/api-docs",
-                "/swagger-ui/**",
-                "/swagger-ui.html",
-                "/swagger-ui/index.html");
-    }
+    // ── JWT Authentication Filter ────────────────────────────────────────────
+    // NOT a @Component — only registered in the Spring Security filter chain
+    // via addFilterBefore(). This prevents Spring Boot from auto-registering
+    // it as a global servlet filter, which would bypass web.ignoring() and
+    // cause 401s on public endpoints like Swagger.
 
-    // ── JWT Authentication Filter (inner-component kept alongside its config) ─
-
-    @Component
-    @RequiredArgsConstructor
     public static class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         private final JwtService jwtService;
         private final UserDetailsService userDetailsService;
+
+        public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+            this.jwtService = jwtService;
+            this.userDetailsService = userDetailsService;
+        }
 
         @Override
         protected void doFilterInternal(HttpServletRequest request,
@@ -126,16 +129,21 @@ public class SecurityConfig {
             if (StringUtils.hasText(email)
                     && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // loadUserByUsername() interface parameter is called 'username',
-                // but here we pass the email — our UserDetailsService queries by email.
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                try {
+                    // loadUserByUsername() interface parameter is called 'username',
+                    // but here we pass the email — our UserDetailsService queries by email.
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    if (jwtService.isTokenValid(jwt, userDetails)) {
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        authToken.setDetails(
+                                new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    }
+                } catch (Exception e) {
+                    // Fail silently so that public/ignored routes (like Swagger) can still be accessed
+                    // even if a stale/invalid token is present in the request.
                 }
             }
 
@@ -143,3 +151,4 @@ public class SecurityConfig {
         }
     }
 }
+

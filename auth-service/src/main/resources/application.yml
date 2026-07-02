@@ -1,12 +1,17 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  AUTH-SERVICE — Multi-Environment Configuration                            ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: auth-service
 
-  datasource:
-    url: jdbc:postgresql://auth-db:5432/auth_db
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
+  profiles:
+    default: local
 
   jpa:
     hibernate:
@@ -17,23 +22,95 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         "[format_sql]": true
 
-  rabbitmq:
-    host: ${RABBITMQ_HOST:rabbitmq}
-    port: 5672
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      timeout: 2000ms
-      connect-timeout: 2000ms
-
 server:
-  port: 8080
+  port: 8081
+
+springdoc:
+  api-docs:
+    path: /auth/v3/api-docs
 
 app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     expiration-ms: 86400000 # 24 hours
+    refresh-expiration-ms: 604800000 # 7 days
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  datasource:
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5431/auth_db}
+    username: ${AUTH_DB_USERNAME:postgres}
+    password: ${AUTH_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${AUTH_DB_URL:jdbc:postgresql://auth-db:5432/auth_db}
+    username: ${AUTH_DB_USERNAME:postgres}
+    password: ${AUTH_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${AUTH_DB_URL:${AUTH_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${AUTH_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${AUTH_DB_PASSWORD:${PROD_DB_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

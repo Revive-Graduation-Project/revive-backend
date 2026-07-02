@@ -1,12 +1,19 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  CLIENT-SERVICE — Multi-Environment Configuration                         ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: client-service
 
-  datasource:
-    url: jdbc:postgresql://client-db:5432/client_db
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
   jpa:
     hibernate:
@@ -18,4 +25,125 @@ spring:
         format_sql: true
 
 server:
+  port: 8082
+
+supabase:
+  url: ${SUPABASE_URL:}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+  bucket: ${SUPABASE_PROFILE_BUCKET:profile-photos}
+
+springdoc:
+  api-docs:
+    path: /api/clients/v3/api-docs
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      client-user-created:
+        name: client.user.created.queue
+        routing-key: user.created.client
+        dlq-name: client.user.created.queue.dlq
+        dlq-routing-key: user.created.dlq
+      auth-compensation:
+        routing-key: client.profile.failed
+      points-redemption-requested:
+        name: points.redemption.requested.queue
+        routing-key: points.redemption.requested
+        dlq-name: points.redemption.requested.queue.dlq
+        dlq-routing-key: points.redemption.requested.dlq
+      points-earned:
+        name: points.earned.queue
+        routing-key: points.earned
+        dlq-name: points.earned.queue.dlq
+        dlq-routing-key: points.earned.dlq
+      points-redemption-rollback:
+        name: points.redemption.rollback.queue
+        routing-key: points.redemption.rollback
+        dlq-name: points.redemption.rollback.queue.dlq
+        dlq-routing-key: points.redemption.rollback.dlq
+      points-redemption-succeeded:
+        routing-key: points.redemption.succeeded
+      points-redemption-failed:
+        routing-key: points.redemption.failed
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: ${CLIENT_DB_URL:jdbc:postgresql://localhost:5432/client_db}
+    username: ${CLIENT_DB_USERNAME:postgres}
+    password: ${CLIENT_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${CLIENT_DB_URL:jdbc:postgresql://client-db:5432/client_db}
+    username: ${CLIENT_DB_USERNAME:postgres}
+    password: ${CLIENT_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
   port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${CLIENT_DB_URL:${CLIENT_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${CLIENT_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${CLIENT_DB_PASSWORD:${PROD_DB_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

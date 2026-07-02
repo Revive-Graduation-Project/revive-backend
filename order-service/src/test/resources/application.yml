@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+          jws-algorithm: HS384
+
+app:
+  services:
+    menu-url: http://localhost:8084
+    customer-url: http://localhost:8085
+
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      ticket-created:
+        name: ticket.created.order.queue
+        routing-key: ticket.created
+      ticket-failed:
+        name: ticket.failed.order.queue
+        routing-key: ticket.failed
+      ticket-ready:
+        name: ticket.ready.order.queue
+        routing-key: ticket.ready
+
+      payment-succeeded:
+        name: payment.succeeded.queue
+        routing-key: payment.succeeded
+      payment-failed:
+        name: payment.failed.queue
+        routing-key: payment.failed
+

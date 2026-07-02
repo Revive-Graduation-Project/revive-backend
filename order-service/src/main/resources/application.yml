@@ -1,12 +1,14 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  ORDER-SERVICE — Multi-Environment Configuration                           ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: order-service
-
-  datasource:
-    url: jdbc:postgresql://order-db:5432/order_db
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -17,5 +19,130 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+          jws-algorithms: HS384
+
+  rabbitmq:
+    # Uses 'rabbitmq' for Docker, falls back to 'localhost' for IDE
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+        default-requeue-rejected: false
+
+server:
+  port: 8085
+
+springdoc:
+  api-docs:
+    path: /api/orders/v3/api-docs
+
+# ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
+app:
+  rabbitmq:
+    exchange: restaurant.events.exchange
+    queues:
+      ticket-created:
+        name: ticket.created.queue
+        routing-key: ticket.created
+      ticket-failed:
+        name: ticket.failed.queue
+        routing-key: ticket.failed
+      ticket-ready:
+        name: ticket.ready.queue
+        routing-key: ticket.ready
+      payment-succeeded:
+        name: payment.succeeded.queue
+        routing-key: payment.succeeded
+      payment-failed:
+        name: payment.failed.queue
+        routing-key: payment.failed
+      point-redemption-succeeded:
+        name: point.redemption.succeeded.queue
+        routing-key: point-redemption.succeeded
+      point-redemption-failed:
+        name: point.redemption.failed.queue
+        routing-key: point-redemption.failed
+
+  services:
+    menu-url: ${MENU_SERVICE_URL:http://menu-management-service:8080}
+    payment-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: jdbc:postgresql://localhost:5435/order_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:postgresql://order-db:5432/order_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
 server:
   port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${ORDER_DB_URL:${ORDER_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${ORDER_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${ORDER_DB_PASSWORD:${PROD_DB_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"

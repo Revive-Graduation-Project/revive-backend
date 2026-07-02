@@ -1,3 +1,11 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  INVENTORY-SERVICE — Multi-Environment Configuration                       ║
+# ║                                                                            ║
+# ║  default  → local IDE run       (localhost, mapped host ports)             ║
+# ║  dev      → Docker Compose run  (container hostnames, internal ports)      ║
+# ║  prod     → Railway deployment  (env vars injected by platform)            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
 spring:
   application:
     name: inventory-service
@@ -7,16 +15,33 @@ spring:
       max-file-size: 5MB
       max-request-size: 5MB
 
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
 
 server:
-  port: 8080
+  port: 8083
+
+springdoc:
+  api-docs:
+    path: /api/inventory/v3/api-docs
+
+# ── External API Keys ────────────────────────────────────────────────────────
+usda:
+  api:
+    key: ${USDA_API_KEY:}
+    url: ${USDA_API_URL:https://api.nal.usda.gov/fdc/v1}
 
 app:
+  keys:
+    google: ${GOOGLE_API_KEY:}
+    deepseek: ${DEEPSEEK_API_KEY:}
+    openrouter: ${OPENROUTER_API_KEY:}
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
@@ -25,3 +50,83 @@ app:
         routing-key: menu.nutrition.processed
         dlq-name: menu.nutrition.processed.queue.dlq
         dlq-routing-key: menu.nutrition.processed.dlq
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEFAULT profile — local IDE run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+
+  datasource:
+    url: ${INVENTORY_DB_URL:jdbc:postgresql://localhost:5433/inventory_db}
+    username: ${INVENTORY_DB_USERNAME:postgres}
+    password: ${INVENTORY_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DEV profile — Docker Compose run
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${INVENTORY_DB_URL:jdbc:postgresql://inventory-db:5432/inventory_db}
+    username: ${INVENTORY_DB_USERNAME:postgres}
+    password: ${INVENTORY_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: 8080
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PROD profile — Railway deployment
+# ─────────────────────────────────────────────────────────────────────────────
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${INVENTORY_DB_URL:${INVENTORY_PROD_DB_URL:${PROD_DB_URL}}}
+    username: ${INVENTORY_DB_USERNAME:${PROD_DB_USERNAME}}
+    password: ${INVENTORY_DB_PASSWORD:${PROD_DB_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:${PROD_RABBITMQ_URL}}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: "*"
