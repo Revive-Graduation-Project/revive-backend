@@ -32,13 +32,16 @@ jobs:
       - name: Get all service IDs
         id: services
         run: |
-          SERVICES=$(curl -s https://backboard.railway.com/graphql/v2 \
+          RESPONSE=$(curl -s https://backboard.railway.app/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"query":"{ project(id: \"'$PROJECT_ID'\") { services { edges { node { id name } } } } }"}' \
-            | jq -r '.data.project.services.edges[].node.id')
+            -d "{\"query\":\"{ project(id: \\\"$PROJECT_ID\\\") { services { edges { node { id name } } } } }\"}")
+          echo "API Response: $RESPONSE"
+          SERVICES=$(echo "$RESPONSE" | jq -r '.data.project.services.edges[].node | "\(.id) \(.name)"')
+          echo "$SERVICES"
+          IDS=$(echo "$RESPONSE" | jq -r '.data.project.services.edges[].node.id')
           echo "ids<<EOF" >> $GITHUB_OUTPUT
-          echo "$SERVICES" >> $GITHUB_OUTPUT
+          echo "$IDS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Railway Down (all services)
