@@ -1,0 +1,42 @@
+name: Railway State
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "up"
+        type: choice
+        options:
+          - up
+          - down
+  schedule:
+    - cron: "0 22 * * *"
+    - cron: "0 5 * * *"
+
+jobs:
+  manage-railway:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Railway Down
+        if: >-
+          github.event.inputs.action == 'down' ||
+          github.event.schedule == '0 22 * * *'
+        run: railway down --yes
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Railway Up
+        if: >-
+          github.event.inputs.action == 'up' ||
+          github.event.schedule == '0 5 * * *'
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
