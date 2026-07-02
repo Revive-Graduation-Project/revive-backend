@@ -40,7 +40,7 @@ public class AuthController {
      * ADMIN can create CHEF and MANAGER roles.
      * MANAGER can only create CHEF role.
      */
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @PostMapping("/staff/signup")
     public ResponseEntity<MessageResponse> signupStaff(@Valid @RequestBody StaffSignupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.signupStaff(request));
@@ -50,7 +50,7 @@ public class AuthController {
      * Registers a new ADMIN member.
      * Only accessible to existing ADMIN roles.
      */
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/signup")
     public ResponseEntity<MessageResponse> signupAdmin(@Valid @RequestBody AdminSignupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.signupAdmin(request));
