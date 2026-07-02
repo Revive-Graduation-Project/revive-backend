@@ -12,8 +12,8 @@ on:
           - up
           - down
   schedule:
-    - cron: "0 22 * * *"
-    - cron: "0 5 * * *"
+    - cron: "0 21 * * *"
+    - cron: "0 12 * * *"
 
 jobs:
   manage-railway:
@@ -28,7 +28,7 @@ jobs:
       - name: Railway Down
         if: >-
           github.event.inputs.action == 'down' ||
-          github.event.schedule == '0 22 * * *'
+          github.event.schedule == '0 21 * * *'
         run: railway down --yes
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -36,7 +36,7 @@ jobs:
       - name: Railway Up
         if: >-
           github.event.inputs.action == 'up' ||
-          github.event.schedule == '0 5 * * *'
+          github.event.schedule == '0 12 * * *'
         run: railway up --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
