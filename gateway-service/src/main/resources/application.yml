@@ -12,8 +12,6 @@ spring:
 
   cloud:
     gateway:
-      routes:
-        - id: auth-service
       httpclient:
         max-request-size: 5MB
       # ── Global CORS — lets browsers talk to the gateway ────────────
@@ -129,12 +127,6 @@ spring:
     gateway:
       routes:
         - id: auth-service
->>>>>>> origin/dev
-          uri: http://auth-service:8080
-          predicates:
-            - Path=/auth/**
-
-        - id: auth-service
           uri: http://auth-service:8080
           predicates:
             - Path=/auth/**
@@ -235,7 +227,6 @@ spring:
 server:
   port: ${PORT:8080}
 
->>>>>>> origin/dev
 management:
   endpoints:
     web:
