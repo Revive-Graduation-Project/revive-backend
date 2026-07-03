@@ -44,7 +44,7 @@ class AdminOrderControllerTest {
 
         when(adminOrderService.getAllOrders(any(), eq("PENDING"))).thenReturn(page);
 
-        mockMvc.perform(get("/api/order/admin/all")
+        mockMvc.perform(get("/api/orders/admin/all")
                 .param("page", "0")
                 .param("size", "10")
                 .param("status", "PENDING")
@@ -66,7 +66,7 @@ class AdminOrderControllerTest {
 
         when(adminOrderService.getDailyMetrics()).thenReturn(metrics);
 
-        mockMvc.perform(get("/api/order/admin/metrics")
+        mockMvc.perform(get("/api/orders/admin/metrics")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalOrders").value(150))
@@ -77,7 +77,7 @@ class AdminOrderControllerTest {
 
     @Test
     void updateOrderStatus_UpdatesAndReturnsStatus() throws Exception {
-        mockMvc.perform(patch("/api/order/admin/1/status")
+        mockMvc.perform(patch("/api/orders/admin/1/status")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\": \"PREPARING\"}"))
                 .andExpect(status().isOk());

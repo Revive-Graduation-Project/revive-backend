@@ -12,6 +12,8 @@ import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.event.UserCreatedEvent;
 import com.restaurant.auth.exception.EmailAlreadyExistsException;
 import com.restaurant.auth.repository.UserRepository;
+import com.restaurant.auth.repository.PasswordResetTokenRepository;
+import com.restaurant.auth.domain.entity.PasswordResetToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -47,6 +51,8 @@ class AuthServiceTest {
     @Mock private JwtService jwtService;
     @Mock private AuthenticationManager authenticationManager;
     @Mock private RabbitTemplate rabbitTemplate;
+    @Mock private PasswordResetTokenRepository tokenRepository;
+    @Mock private EmailService emailService;
 
     @InjectMocks
     private AuthService authService;
@@ -245,5 +251,75 @@ class AuthServiceTest {
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(userRepository, never()).findByEmail(any());
+    }
+
+    // ── Password Reset ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("requestPasswordReset() generates a token and sends an email if user exists")
+    void requestPasswordReset_userExists_sendsEmail() {
+        given(userRepository.findByEmail("john@example.com")).willReturn(Optional.of(savedUser));
+        
+        authService.requestPasswordReset("john@example.com", "http://localhost/reset");
+
+        ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
+        verify(tokenRepository).save(tokenCaptor.capture());
+        
+        PasswordResetToken savedToken = tokenCaptor.getValue();
+        assertThat(savedToken.getUser()).isEqualTo(savedUser);
+        assertThat(savedToken.getToken()).isNotNull();
+        assertThat(savedToken.getExpiryDate()).isAfter(LocalDateTime.now());
+        
+        verify(emailService).sendPasswordResetEmail(eq("john@example.com"), contains(savedToken.getToken()));
+    }
+
+    @Test
+    @DisplayName("requestPasswordReset() does nothing silently if user does not exist")
+    void requestPasswordReset_userNotFound_doesNothing() {
+        given(userRepository.findByEmail("unknown@example.com")).willReturn(Optional.empty());
+        
+        authService.requestPasswordReset("unknown@example.com", "http://localhost/reset");
+
+        verify(tokenRepository, never()).save(any());
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("resetPassword() updates password if token is valid")
+    void resetPassword_validToken_updatesPassword() {
+        PasswordResetToken token = PasswordResetToken.builder()
+                .token("valid-uuid")
+                .user(savedUser)
+                .expiryDate(LocalDateTime.now().plusMinutes(15))
+                .build();
+        
+        given(tokenRepository.findByToken("valid-uuid")).willReturn(Optional.of(token));
+        given(passwordEncoder.encode("newPassword")).willReturn("$2a$newhashed");
+        
+        authService.resetPassword("valid-uuid", "newPassword");
+
+        verify(passwordEncoder).encode("newPassword");
+        verify(userRepository).save(savedUser);
+        assertThat(savedUser.getPassword()).isEqualTo("$2a$newhashed");
+        verify(tokenRepository).delete(token);
+    }
+
+    @Test
+    @DisplayName("resetPassword() throws exception if token is expired")
+    void resetPassword_expiredToken_throwsException() {
+        PasswordResetToken token = PasswordResetToken.builder()
+                .token("expired-uuid")
+                .user(savedUser)
+                .expiryDate(LocalDateTime.now().minusMinutes(5)) // Expired
+                .build();
+        
+        given(tokenRepository.findByToken("expired-uuid")).willReturn(Optional.of(token));
+        
+        assertThatThrownBy(() -> authService.resetPassword("expired-uuid", "newPassword"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid or expired reset token");
+
+        verify(userRepository, never()).save(any());
+        verify(tokenRepository, never()).delete(any());
     }
 }

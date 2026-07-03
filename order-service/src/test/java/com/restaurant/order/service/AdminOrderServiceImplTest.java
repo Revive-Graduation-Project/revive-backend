@@ -75,19 +75,41 @@ class AdminOrderServiceImplTest {
     }
 
     @Test
+    void getAllOrders_ThrowsBadRequest_WhenStatusIsInvalid() {
+        PageRequest pageRequest = PageRequest.of(0, 10);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> 
+            adminOrderService.getAllOrders(pageRequest, "INVALID_STATUS")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        verify(orderRepository, never()).findByStatus(any(), any());
+    }
+
+    @Test
     void getDailyMetrics_ReturnsCalculatedMetrics() {
-        when(orderRepository.countOrdersInDateRange(any(), any())).thenReturn(150L);
-        when(orderRepository.countOrdersByStatusInDateRange(eq(OrderStatus.PREPARING), any(), any())).thenReturn(10L);
-        when(orderRepository.countOrdersByStatusInDateRange(eq(OrderStatus.DONE), any(), any())).thenReturn(100L);
-        when(orderRepository.sumSalesByStatusInDateRange(eq(OrderStatus.DONE), any(), any())).thenReturn(BigDecimal.valueOf(5000));
+        when(orderRepository.countOrdersInDateRange(any(), any())).thenReturn(150L).thenReturn(100L); // Today, Yesterday
+        when(orderRepository.countOrdersByStatusInDateRange(eq(OrderStatus.PREPARING), any(), any())).thenReturn(10L).thenReturn(10L); // Today, Yesterday
+        when(orderRepository.countOrdersByStatusInDateRange(eq(OrderStatus.DONE), any(), any())).thenReturn(100L).thenReturn(50L); // Today, Yesterday
+        
+        when(orderRepository.sumSalesByStatusInDateRange(eq(OrderStatus.DONE), any(), any()))
+                .thenReturn(BigDecimal.valueOf(5000))
+                .thenReturn(BigDecimal.valueOf(2500)); // Today, Yesterday
 
         Map<String, Object> metrics = adminOrderService.getDailyMetrics();
 
         assertEquals(150L, metrics.get("totalOrders"));
+        assertEquals(50L, metrics.get("totalOrdersChange")); // (150 - 100) / 100 * 100
+
         assertEquals(10L, metrics.get("preparing"));
+        assertEquals(0L, metrics.get("preparingChange")); // (10 - 10) / 10 * 100
+
         assertEquals(100L, metrics.get("completed"));
+        assertEquals(100L, metrics.get("completedChange")); // (100 - 50) / 50 * 100
+
         assertEquals(BigDecimal.valueOf(5000), metrics.get("salesCurrent"));
-        assertEquals(BigDecimal.valueOf(10000), metrics.get("salesTarget")); // Assuming hardcoded target for now
+        assertEquals(BigDecimal.valueOf(10000), metrics.get("salesTarget")); // Configurable target
+        
+        assertEquals(100L, metrics.get("ordersCurrent"));
         assertEquals(200L, metrics.get("ordersTarget"));
     }
 

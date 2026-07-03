@@ -33,7 +33,12 @@ public class AdminOrderServiceImpl implements AdminOrderService {
     public Page<OrderResponse> getAllOrders(Pageable pageable, String status) {
         Page<Order> orders;
         if (status != null && !status.isEmpty()) {
-            OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
+            OrderStatus orderStatus;
+            try {
+                orderStatus = OrderStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid order status: " + status);
+            }
             orders = orderRepository.findByStatus(orderStatus, pageable);
         } else {
             orders = orderRepository.findAll(pageable);
@@ -44,42 +49,60 @@ public class AdminOrderServiceImpl implements AdminOrderService {
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> getDailyMetrics() {
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
-        long totalOrders = orderRepository.countOrdersInDateRange(startOfDay, endOfDay);
-        long preparing = orderRepository.countOrdersByStatusInDateRange(OrderStatus.PREPARING, startOfDay, endOfDay);
-        long completed = orderRepository.countOrdersByStatusInDateRange(OrderStatus.DONE, startOfDay, endOfDay);
-        BigDecimal salesCurrent = orderRepository.sumSalesByStatusInDateRange(OrderStatus.DONE, startOfDay, endOfDay);
+        LocalDate yesterday = today.minusDays(1);
+        LocalDateTime startOfYesterday = yesterday.atStartOfDay();
+        LocalDateTime endOfYesterday = yesterday.atTime(LocalTime.MAX);
 
-        // Calculate goals (could be fetched from config or DB)
-        long totalOrdersChange = 5; // Mock change percentage
-        long preparingChange = -2; // Mock change percentage
-        long completedChange = 12; // Mock change percentage
-        BigDecimal salesTarget = BigDecimal.valueOf(10000); // Mock target
-        long ordersTarget = 200; // Mock target
+        long totalOrdersToday = orderRepository.countOrdersInDateRange(startOfDay, endOfDay);
+        long totalOrdersYesterday = orderRepository.countOrdersInDateRange(startOfYesterday, endOfYesterday);
+
+        long preparingToday = orderRepository.countOrdersByStatusInDateRange(OrderStatus.PREPARING, startOfDay, endOfDay);
+        long preparingYesterday = orderRepository.countOrdersByStatusInDateRange(OrderStatus.PREPARING, startOfYesterday, endOfYesterday);
+
+        long completedToday = orderRepository.countOrdersByStatusInDateRange(OrderStatus.DONE, startOfDay, endOfDay);
+        long completedYesterday = orderRepository.countOrdersByStatusInDateRange(OrderStatus.DONE, startOfYesterday, endOfYesterday);
+
+        BigDecimal salesToday = orderRepository.sumSalesByStatusInDateRange(OrderStatus.DONE, startOfDay, endOfDay);
+        if (salesToday == null) salesToday = BigDecimal.ZERO;
+        // BigDecimal salesYesterday = orderRepository.sumSalesByStatusInDateRange(OrderStatus.DONE, startOfYesterday, endOfYesterday);
+        // if (salesYesterday == null) salesYesterday = BigDecimal.ZERO;
+
+        // Calculate goals (these should ideally be injected via @Value, keeping hardcoded for this refactor to avoid changing too many files)
+        BigDecimal salesTarget = BigDecimal.valueOf(10000); 
+        long ordersTarget = 200; 
 
         Map<String, Object> metrics = new HashMap<>();
-        metrics.put("totalOrders", totalOrders);
-        metrics.put("totalOrdersChange", totalOrdersChange);
-        metrics.put("preparing", preparing);
-        metrics.put("preparingChange", preparingChange);
-        metrics.put("completed", completed);
-        metrics.put("completedChange", completedChange);
-        metrics.put("salesCurrent", salesCurrent);
+        metrics.put("totalOrders", totalOrdersToday);
+        metrics.put("totalOrdersChange", calculateChange(totalOrdersToday, totalOrdersYesterday));
+        metrics.put("preparing", preparingToday);
+        metrics.put("preparingChange", calculateChange(preparingToday, preparingYesterday));
+        metrics.put("completed", completedToday);
+        metrics.put("completedChange", calculateChange(completedToday, completedYesterday));
+        metrics.put("salesCurrent", salesToday);
         metrics.put("salesTarget", salesTarget);
-        metrics.put("ordersCurrent", completed);
+        metrics.put("ordersCurrent", completedToday);
         metrics.put("ordersTarget", ordersTarget);
 
         Map<String, Object> dailyGoal = new HashMap<>();
-        dailyGoal.put("salesCurrent", salesCurrent);
+        dailyGoal.put("salesCurrent", salesToday);
         dailyGoal.put("salesTarget", salesTarget);
-        dailyGoal.put("ordersCurrent", completed);
+        dailyGoal.put("ordersCurrent", completedToday);
         dailyGoal.put("ordersTarget", ordersTarget);
 
         metrics.put("dailyGoal", dailyGoal);
 
         return metrics;
+    }
+
+    private long calculateChange(long today, long yesterday) {
+        if (yesterday == 0) {
+            return today == 0 ? 0 : 100;
+        }
+        return (long) (((double) (today - yesterday) / yesterday) * 100);
     }
 
     @Override

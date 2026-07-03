@@ -24,7 +24,7 @@ public class IngredientResolutionService {
 
     private final OpenRouter agent;
     private final UsdaService usdaService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public List<IngredientNutrition> resolveIngredients(List<IngredientEntry> ingredients) {
         log.info("Resolving {} ingredients via AI and USDA", ingredients.size());
@@ -60,6 +60,7 @@ public class IngredientResolutionService {
                     originalEntry.unit(),
                     food.fdcId(),
                     food.description(),
+                    food.foodCategory(),
                     food.foodNutrients());
         }).toList();
     }

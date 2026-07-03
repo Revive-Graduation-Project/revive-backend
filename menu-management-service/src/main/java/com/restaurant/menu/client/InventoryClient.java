@@ -11,6 +11,9 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.retry.annotation.Backoff;
+
 @Component
 @Slf4j
 public class InventoryClient {
@@ -24,6 +27,7 @@ public class InventoryClient {
                 .build();
     }
 
+    @Retryable(retryFor = RuntimeException.class, maxAttempts = 3, backoff = @Backoff(delay = 1000))
     public List<IngredientNutrition> resolveIngredients(List<IngredientEntry> ingredients) {
         log.info("Requesting inventory-service to resolve {} missing ingredients", ingredients.size());
 
