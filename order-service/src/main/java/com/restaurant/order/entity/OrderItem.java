@@ -36,6 +36,9 @@ public class OrderItem {
     @Column(name = "snapshot_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal snapshotPrice;
 
+    @Column(name = "snapshot_image_url")
+    private String snapshotImageUrl;
+
     @Column(nullable = false)
     private Integer quantity;
 }

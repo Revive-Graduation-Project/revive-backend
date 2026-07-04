@@ -5,6 +5,7 @@ import com.restaurant.order.dto.response.OrderResponse;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 import java.util.List;
 

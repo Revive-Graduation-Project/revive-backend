@@ -63,7 +63,7 @@ class OrderServiceImplTest {
         // Using CREDIT_CARD as requested
         PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), 100, PaymentMethod.CREDIT_CARD);
 
-        when(menuClient.getMealById(mealId)).thenReturn(new MealPriceSnapshot(mealId, "Test Meal", BigDecimal.valueOf(9.99)));
+        when(menuClient.getMealById(mealId)).thenReturn(new MealPriceSnapshot(mealId, "Test Meal", BigDecimal.valueOf(9.99), "http://example.com/image.jpg"));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(1L);
