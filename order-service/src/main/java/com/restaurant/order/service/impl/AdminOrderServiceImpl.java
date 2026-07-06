@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -68,8 +69,8 @@ public class AdminOrderServiceImpl implements AdminOrderService {
 
         BigDecimal salesToday = orderRepository.sumSalesByStatusInDateRange(OrderStatus.DONE, startOfDay, endOfDay);
         if (salesToday == null) salesToday = BigDecimal.ZERO;
-        // BigDecimal salesYesterday = orderRepository.sumSalesByStatusInDateRange(OrderStatus.DONE, startOfYesterday, endOfYesterday);
-        // if (salesYesterday == null) salesYesterday = BigDecimal.ZERO;
+        BigDecimal salesYesterday = orderRepository.sumSalesByStatusInDateRange(OrderStatus.DONE, startOfYesterday, endOfYesterday);
+        if (salesYesterday == null) salesYesterday = BigDecimal.ZERO;
 
         // Calculate goals (these should ideally be injected via @Value, keeping hardcoded for this refactor to avoid changing too many files)
         BigDecimal salesTarget = BigDecimal.valueOf(10000); 
@@ -83,6 +84,7 @@ public class AdminOrderServiceImpl implements AdminOrderService {
         metrics.put("completed", completedToday);
         metrics.put("completedChange", calculateChange(completedToday, completedYesterday));
         metrics.put("salesCurrent", salesToday);
+        metrics.put("salesChange", calculateChange(salesToday, salesYesterday));
         metrics.put("salesTarget", salesTarget);
         metrics.put("ordersCurrent", completedToday);
         metrics.put("ordersTarget", ordersTarget);
@@ -103,6 +105,13 @@ public class AdminOrderServiceImpl implements AdminOrderService {
             return today == 0 ? 0 : 100;
         }
         return (long) (((double) (today - yesterday) / yesterday) * 100);
+    }
+
+    private long calculateChange(BigDecimal today, BigDecimal yesterday) {
+        if (yesterday == null || yesterday.compareTo(BigDecimal.ZERO) == 0) {
+            return (today == null || today.compareTo(BigDecimal.ZERO) == 0) ? 0 : 100;
+        }
+        return today.subtract(yesterday).divide(yesterday, 2, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).longValue();
     }
 
     @Override

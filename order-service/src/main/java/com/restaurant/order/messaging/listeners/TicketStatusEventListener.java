@@ -34,7 +34,7 @@ public class TicketStatusEventListener {
                 case READY -> orderService.onTicketReady(orderId);
                 case CANCELED -> orderService.processTicketCancellationSuccess(orderId);
                 // DONE might just map to READY or stay READY in OrderService?
-                case DONE -> orderService.onTicketReady(orderId);
+                case DONE -> orderService.onTicketDone(orderId);
                 default -> log.warn("Received unmapped ticket status '{}' for orderId: {}", status, orderId);
             }
         } catch (Exception e) {

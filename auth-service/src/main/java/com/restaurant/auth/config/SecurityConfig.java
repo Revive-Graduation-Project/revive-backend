@@ -56,7 +56,13 @@ public class SecurityConfig {
                 // Authorisation rules
                 .authorizeHttpRequests(auth -> auth
                         // 1. Your public auth endpoints
-                        .requestMatchers("/auth/signup", "/auth/login", "/auth/refresh").permitAll()
+                        .requestMatchers(
+                                "/auth/signup", 
+                                "/auth/login", 
+                                "/auth/refresh",
+                                "/auth/password/reset-request",
+                                "/auth/password/reset"
+                        ).permitAll()
 
                         // 2. Swagger UI and OpenAPI docs (Safe for public viewing)
                         .requestMatchers(

@@ -14,6 +14,8 @@ public interface  OrderService {
     
     void onTicketReady(Long orderId);
 
+    void onTicketDone(Long orderId);
+
     void onTicketStarted(Long orderId, Long ticketId);
 
     void markPaymentSucceeded(Long orderId);

@@ -9,4 +9,5 @@ public enum OrderStatus {
     CANCELLATION_PENDING,
     CANCELED,
     READY,
+    DONE
 }

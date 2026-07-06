@@ -47,8 +47,9 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
         String path = request.getURI().getPath();
         String method = request.getMethod().name();
 
-        // 1. Check if route is public
-        boolean isPublic = PUBLIC_PATHS.stream().anyMatch(path::startsWith) ||
+        // 1. Check if route is public or if it's a CORS OPTIONS request
+        boolean isPublic = method.equals("OPTIONS") ||
+                PUBLIC_PATHS.stream().anyMatch(path::startsWith) ||
                 path.contains("/v3/api-docs") ||
                 (method.equals("GET") && (path.startsWith("/api/menu") || path.startsWith("/api/ingredients")));
 

@@ -38,6 +38,8 @@ springdoc:
 
 # ── RabbitMQ Queue Config (shared across profiles) ───────────────────────────
 app:
+  services:
+    inventory-url: ${INVENTORY_SERVICE_URL:http://localhost:8083}
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
@@ -90,6 +92,10 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+
+app:
+  services:
+    inventory-url: http://inventory-service:8080
 
 server:
   port: 8080

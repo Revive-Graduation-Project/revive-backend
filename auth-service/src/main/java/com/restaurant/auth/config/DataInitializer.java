@@ -15,18 +15,20 @@ public class DataInitializer {
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
     @Bean
-    public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                                           @org.springframework.beans.factory.annotation.Value("${app.admin.default-email:admin@revive.com}") String adminEmail,
+                                           @org.springframework.beans.factory.annotation.Value("${app.admin.default-password:admin123}") String adminPassword) {
         return args -> {
-            if (userRepository.findByEmail("admin@revive.com").isEmpty()) {
+            if (userRepository.findByEmail(adminEmail).isEmpty()) {
                 User admin = User.builder()
-                        .email("admin@revive.com")
-                        .password(passwordEncoder.encode("admin123"))
+                        .email(adminEmail)
+                        .password(passwordEncoder.encode(adminPassword))
                         .role(Role.ADMIN)
                         .firstName("System")
                         .lastName("Admin")
                         .build();
                 userRepository.save(admin);
-                log.info("Default admin user created: admin@revive.com / admin123");
+                log.info("Default admin user created: {}", adminEmail);
             }
         };
     }

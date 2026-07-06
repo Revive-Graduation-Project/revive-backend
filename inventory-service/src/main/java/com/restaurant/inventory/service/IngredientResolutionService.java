@@ -48,11 +48,15 @@ public class IngredientResolutionService {
 
         List<UsdaFoodDetail> foodDetails = usdaService.fetchNutrients(normalized, quantityMap);
 
-        return foodDetails.stream().map(food -> {
-            IngredientEntry originalEntry = ingredients.stream()
-                    .filter(i -> i.name().equals(food.originalName()))
+        return ingredients.stream().map(originalEntry -> {
+            UsdaFoodDetail food = foodDetails.stream()
+                    .filter(f -> f.originalName().equals(originalEntry.name()))
                     .findFirst()
-                    .orElse(new IngredientEntry(food.originalName(), 0, ""));
+                    .orElse(null);
+
+            if (food == null) {
+                return new IngredientNutrition(originalEntry.name(), originalEntry.quantity(), originalEntry.unit(), null, "", "", null);
+            }
 
             return new IngredientNutrition(
                     food.originalName(),
@@ -97,8 +101,8 @@ public class IngredientResolutionService {
                     resultMap.put(item.originalName(), item);
                 }
             } catch (JsonProcessingException e) {
-                log.error("Failed to parse AI JSON for chunk. Raw response: {}", aiResponse, e);
-                throw new RuntimeException("Failed to parse AI JSON for batch chunk. Raw response: " + aiResponse, e);
+                log.error("Failed to parse AI JSON for chunk {} to {}. Raw response: {}", i, end, aiResponse, e);
+                // Skip chunk; callers fall back to original names via getOrDefault
             }
         }
         return resultMap;
