@@ -109,6 +109,10 @@ spring:
 server:
   port: ${PORT:8080}
 
+app:
+  frontend:
+    url: ${FRONTEND_PROD_URL:https://revive-frontend.vercel.app}
+
 management:
   endpoints:
     web:
