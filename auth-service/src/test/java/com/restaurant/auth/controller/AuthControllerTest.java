@@ -6,6 +6,8 @@ import com.restaurant.auth.dto.AuthRequest;
 import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
+import com.restaurant.auth.dto.PasswordResetRequestDto;
+import com.restaurant.auth.dto.PasswordResetConfirmDto;
 import com.restaurant.auth.exception.GlobalExceptionHandler;
 import com.restaurant.auth.exception.EmailAlreadyExistsException;
 import com.restaurant.auth.service.AuthService;
@@ -24,6 +26,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -220,5 +224,62 @@ class AuthControllerTest {
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isUnauthorized())
                                 .andExpect(jsonPath("$.message").value("Invalid username or password"));
+        }
+
+        // ── POST /auth/password/reset-request ──────────────────────────────────────
+
+        @Test
+        @DisplayName("POST /auth/password/reset-request returns 200 and success message")
+        void resetRequest_validEmail_returns200() throws Exception {
+                PasswordResetRequestDto request = new PasswordResetRequestDto("johndoe@example.com");
+
+                doNothing().when(authService).requestPasswordReset(anyString(), anyString());
+
+                mockMvc.perform(post("/auth/password/reset-request")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message").value("If an account exists, a password reset link has been sent to the email."));
+        }
+
+        @Test
+        @DisplayName("POST /auth/password/reset-request returns 400 when email is invalid")
+        void resetRequest_invalidEmail_returns400() throws Exception {
+                PasswordResetRequestDto request = new PasswordResetRequestDto("invalid-email");
+
+                mockMvc.perform(post("/auth/password/reset-request")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.fieldErrors.email").exists());
+        }
+
+        // ── POST /auth/password/reset ──────────────────────────────────────────────
+
+        @Test
+        @DisplayName("POST /auth/password/reset returns 200 on success")
+        void resetPassword_validToken_returns200() throws Exception {
+                PasswordResetConfirmDto request = new PasswordResetConfirmDto("valid-token", "newPassword123");
+
+                doNothing().when(authService).resetPassword("valid-token", "newPassword123");
+
+                mockMvc.perform(post("/auth/password/reset")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message").value("Password has been successfully reset."));
+        }
+
+        @Test
+        @DisplayName("POST /auth/password/reset returns 400 when token or password is missing/short")
+        void resetPassword_invalidRequest_returns400() throws Exception {
+                PasswordResetConfirmDto request = new PasswordResetConfirmDto("", "short");
+
+                mockMvc.perform(post("/auth/password/reset")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.fieldErrors.token").exists())
+                                .andExpect(jsonPath("$.fieldErrors.newPassword").exists());
         }
 }

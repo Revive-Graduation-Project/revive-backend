@@ -53,6 +53,7 @@ public class IngredientServiceImpl implements IngredientService {
                     Ingredient newIng = Ingredient.builder()
                             .name(ingDto.ingredientName())
                             .description(ingDto.description())
+                            .category(ingDto.foodCategory())
                             .nutrients(ingNutrients)
                             .build();
                     return ingredientRepository.save(newIng);

@@ -103,6 +103,7 @@ public class MenuCsvService {
                             originalEntry.unit(),
                             food.fdcId(),
                             food.description(),
+                            food.foodCategory(),
                             food.foodNutrients());
                 }).toList();
 

@@ -320,6 +320,18 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
+    public void onTicketDone(Long orderId) {
+        orderRepository.findById(orderId).ifPresentOrElse(
+                order -> {
+                    order.setStatus(OrderStatus.DONE);
+                    orderRepository.save(order);
+                },
+                () -> log.error("Order not found for ticket done status, ID: {}", orderId)
+        );
+    }
+
+    @Transactional
+    @Override
     public void onTicketStarted(Long orderId, Long ticketId) {
         orderRepository.findById(orderId).ifPresentOrElse(
                 order -> {
