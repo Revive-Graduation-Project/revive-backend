@@ -87,6 +87,7 @@ public class OrderServiceImpl implements OrderService {
                         .mealId(meal.id())
                         .snapshotName(meal.name())
                         .snapshotPrice(meal.price())
+                        .snapshotImageUrl(meal.imageUrl())
                         .quantity(itemReq.quantity())
                         .build());
             } catch (Exception e) {
