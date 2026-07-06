@@ -47,7 +47,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-                        .requestMatchers("/api/kitchen/tickets/**").hasRole("CHEF")
+                        .requestMatchers("/api/kitchen/tickets/**").hasAnyRole("CHEF" , "ADMIN")
                         .requestMatchers("/api/kitchen/chefs/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
