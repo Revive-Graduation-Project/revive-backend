@@ -36,7 +36,7 @@ public class OrderItem {
     @Column(name = "snapshot_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal snapshotPrice;
 
-    @Column(name = "snapshot_image_url")
+    @Column(name = "snapshot_image_url", length = 1024)
     private String snapshotImageUrl;
 
     @Column(nullable = false)

@@ -40,7 +40,7 @@ class TicketStatusEventListenerTest {
         TicketStatusUpdatedEvent event = new TicketStatusUpdatedEvent(1L, 10L, TicketStatus.DONE);
         listener.handleTicketStatusUpdated(event);
         // Original code had DONE map to onTicketReady.
-        verify(orderService).onTicketReady(10L);
+        verify(orderService).onTicketDone(10L);
     }
 
     @Test
