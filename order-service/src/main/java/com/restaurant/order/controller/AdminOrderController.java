@@ -40,7 +40,12 @@ public class AdminOrderController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         
-        OrderStatus newStatus = OrderStatus.valueOf(body.get("status").toUpperCase());
+        OrderStatus newStatus;
+        try {
+            newStatus = OrderStatus.valueOf(body.get("status").toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid order status");
+        }
         adminOrderService.updateOrderStatus(id, newStatus);
         return ResponseEntity.ok().build();
     }

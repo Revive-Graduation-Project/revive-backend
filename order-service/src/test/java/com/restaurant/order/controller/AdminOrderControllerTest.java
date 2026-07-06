@@ -39,7 +39,7 @@ class AdminOrderControllerTest {
 
     @Test
     void getAllOrders_ReturnsPaginatedOrders() throws Exception {
-        OrderResponse order1 = new OrderResponse(1L, 100L, "John Doe", OrderStatus.PENDING, BigDecimal.TEN, 0, LocalDateTime.now(), null, null, List.of());
+        OrderResponse order1 = new OrderResponse(1L, 100L, OrderStatus.PENDING, BigDecimal.TEN, 0, LocalDateTime.now(), null, null, List.of());
         Page<OrderResponse> page = new PageImpl<>(List.of(order1), PageRequest.of(0, 10), 1);
 
         when(adminOrderService.getAllOrders(any(), eq("PENDING"))).thenReturn(page);
@@ -83,5 +83,12 @@ class AdminOrderControllerTest {
                 .andExpect(status().isOk());
 
         verify(adminOrderService).updateOrderStatus(1L, OrderStatus.PREPARING);
+    }
+    @Test
+    void updateOrderStatus_ThrowsBadRequest_WhenStatusIsInvalid() throws Exception {
+        mockMvc.perform(patch("/api/orders/admin/1/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\": \"INVALID\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

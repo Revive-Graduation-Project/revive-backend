@@ -15,6 +15,13 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.exchange}")
     private String exchange;
 
+    // ticket.status.updated — response from ticket status updates
+    @Value("${app.rabbitmq.queues.ticket-status-updated.name}")
+    private String ticketStatusUpdatedQueue;
+
+    @Value("${app.rabbitmq.queues.ticket-status-updated.routing-key}")
+    private String ticketStatusUpdatedRoutingKey;
+
     // ticket.created — response from kitchen-service
     @Value("${app.rabbitmq.queues.ticket-created.name}")
     private String ticketCreatedQueue;
@@ -107,6 +114,11 @@ public class RabbitMQConfig {
 
     // --------- Queues ----------
     @Bean
+    public Queue ticketStatusUpdatedQueue() {
+        return QueueBuilder.durable(ticketStatusUpdatedQueue).build();
+    }
+
+    @Bean
     public Queue ticketCreatedQueue() {
         return QueueBuilder.durable(ticketCreatedQueue).build();
     }
@@ -153,6 +165,14 @@ public class RabbitMQConfig {
     }
 
     // --------- Bindings ----------
+    @Bean
+    public Binding bindingTicketStatusUpdatedQueue() {
+        return BindingBuilder
+                .bind(ticketStatusUpdatedQueue())
+                .to(restaurantExchange())
+                .with(ticketStatusUpdatedRoutingKey);
+    }
+
     @Bean
     public Binding bindingTicketCreatedQueue() {
         return BindingBuilder

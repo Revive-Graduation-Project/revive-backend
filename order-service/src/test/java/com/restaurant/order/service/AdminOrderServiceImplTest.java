@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,7 +51,7 @@ class AdminOrderServiceImplTest {
         Page<Order> orderPage = new PageImpl<>(List.of(order));
 
         when(orderRepository.findAll(pageRequest)).thenReturn(orderPage);
-        when(orderMapper.toResponse(order)).thenReturn(new OrderResponse(1L, 100L, "John Doe", OrderStatus.PENDING, BigDecimal.TEN, 0, null, null, null, List.of()));
+        when(orderMapper.toResponse(order)).thenReturn(new OrderResponse(1L, 100L, OrderStatus.PENDING, BigDecimal.TEN, 0, LocalDateTime.now(), null, null, List.of()));
 
         Page<OrderResponse> result = adminOrderService.getAllOrders(pageRequest, null);
 
@@ -66,7 +67,7 @@ class AdminOrderServiceImplTest {
         Page<Order> orderPage = new PageImpl<>(List.of(order));
 
         when(orderRepository.findByStatus(OrderStatus.PREPARING, pageRequest)).thenReturn(orderPage);
-        when(orderMapper.toResponse(order)).thenReturn(new OrderResponse(1L, 100L, "John Doe", OrderStatus.PREPARING, BigDecimal.TEN, 0, null, null, null, List.of()));
+        when(orderMapper.toResponse(order)).thenReturn(new OrderResponse(1L, 100L, OrderStatus.PREPARING, BigDecimal.TEN, 0, LocalDateTime.now(), null, null, List.of()));
 
         Page<OrderResponse> result = adminOrderService.getAllOrders(pageRequest, "PREPARING");
 
@@ -107,6 +108,7 @@ class AdminOrderServiceImplTest {
         assertEquals(100L, metrics.get("completedChange")); // (100 - 50) / 50 * 100
 
         assertEquals(BigDecimal.valueOf(5000), metrics.get("salesCurrent"));
+        assertEquals(100L, metrics.get("salesChange")); // (5000 - 2500) / 2500 * 100
         assertEquals(BigDecimal.valueOf(10000), metrics.get("salesTarget")); // Configurable target
         
         assertEquals(100L, metrics.get("ordersCurrent"));
