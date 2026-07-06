@@ -30,6 +30,20 @@ public class DataInitializer {
                 userRepository.save(admin);
                 log.info("Default admin user created: {}", adminEmail);
             }
+            
+            // Seed specific admin user requested by developer
+            String specificAdminEmail = "himayasin00@gmail.com";
+            if (userRepository.findByEmail(specificAdminEmail).isEmpty()) {
+                User specificAdmin = User.builder()
+                        .email(specificAdminEmail)
+                        .password(passwordEncoder.encode("admin"))
+                        .role(Role.ADMIN)
+                        .firstName("Hima")
+                        .lastName("Yasin")
+                        .build();
+                userRepository.save(specificAdmin);
+                log.info("Specific admin user created: {}", specificAdminEmail);
+            }
         };
     }
 }
