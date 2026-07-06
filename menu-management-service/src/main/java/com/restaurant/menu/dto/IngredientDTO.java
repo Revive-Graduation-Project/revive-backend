@@ -14,6 +14,8 @@ public record IngredientDTO(
 
         String description,
 
+        String category,
+
         List<Map<String, Object>> nutrients,
 
         @PositiveOrZero(message = "Stock cannot be negative")

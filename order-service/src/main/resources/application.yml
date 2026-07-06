@@ -54,6 +54,9 @@ app:
   rabbitmq:
     exchange: restaurant.events.exchange
     queues:
+      ticket-status-updated:
+        name: ticket.status.updated.queue
+        routing-key: ticket.status.updated
       ticket-created:
         name: ticket.created.queue
         routing-key: ticket.created

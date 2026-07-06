@@ -8,5 +8,6 @@ public record IngredientNutrition(
                 String unit,
                 int fdcId,
                 String description,
+                String foodCategory,
                 List<NutrientInfo> nutrients) {
 }
