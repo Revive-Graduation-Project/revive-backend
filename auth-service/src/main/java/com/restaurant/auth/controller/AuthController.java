@@ -7,6 +7,8 @@ import com.restaurant.auth.dto.AuthTokenPair;
 import com.restaurant.auth.dto.MessageResponse;
 import com.restaurant.auth.dto.SignupRequest;
 import com.restaurant.auth.dto.StaffSignupRequest;
+import com.restaurant.auth.dto.PasswordResetRequestDto;
+import com.restaurant.auth.dto.PasswordResetConfirmDto;
 import com.restaurant.auth.service.AuthService;
 import com.restaurant.auth.service.JwtService;
 import jakarta.validation.Valid;
@@ -17,6 +19,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/auth")
@@ -25,6 +28,9 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     /**
      * Registers a new user and returns a JWT on success.
@@ -97,5 +103,20 @@ public class AuthController {
                 .path("/")
                 .maxAge(jwtService.getRefreshExpirationSeconds())
                 .build();
+    }
+
+    // ── Password Reset ────────────────────────────────────────────────────────
+
+    @PostMapping("/password/reset-request")
+    public ResponseEntity<MessageResponse> requestPasswordReset(@Valid @RequestBody PasswordResetRequestDto request) {
+        String resetUrl = frontendUrl + "/reset-password";
+        authService.requestPasswordReset(request.getEmail(), resetUrl);
+        return ResponseEntity.ok(new MessageResponse("If an account exists, a password reset link has been sent to the email."));
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody PasswordResetConfirmDto request) {
+        authService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok(new MessageResponse("Password has been successfully reset."));
     }
 }

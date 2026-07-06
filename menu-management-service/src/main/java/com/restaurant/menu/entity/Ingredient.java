@@ -28,6 +28,9 @@ public class Ingredient {
     @Column(name = "description")
     private String description;
 
+    @Column(name = "category")
+    private String category;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private List<Map<String, Object>> nutrients;

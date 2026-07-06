@@ -12,6 +12,8 @@ import com.restaurant.auth.dto.StaffSignupRequest;
 import com.restaurant.auth.event.UserCreatedEvent;
 import com.restaurant.auth.exception.EmailAlreadyExistsException;
 import com.restaurant.auth.repository.UserRepository;
+import com.restaurant.auth.repository.PasswordResetTokenRepository;
+import com.restaurant.auth.domain.entity.PasswordResetToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
@@ -30,6 +32,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -41,6 +44,8 @@ public class AuthService {
         private final JwtService jwtService;
         private final AuthenticationManager authenticationManager;
         private final RabbitTemplate rabbitTemplate;
+        private final PasswordResetTokenRepository tokenRepository;
+        private final EmailService emailService;
 
         // ── Signup ────────────────────────────────────────────────────────────────
 
@@ -282,5 +287,44 @@ public class AuthService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("Unable to hash refresh token", ex);
         }
+    }
+
+    // ── Password Reset ────────────────────────────────────────────────────────
+
+    @Transactional
+    public void requestPasswordReset(String email, String resetUrlBase) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            String tokenString = UUID.randomUUID().toString();
+            
+            // Delete any existing tokens for this user
+            tokenRepository.deleteByUser(user);
+            
+            PasswordResetToken token = PasswordResetToken.builder()
+                    .token(tokenString)
+                    .user(user)
+                    .expiryDate(LocalDateTime.now().plusMinutes(15))
+                    .build();
+            
+            tokenRepository.save(token);
+            
+            String resetLink = resetUrlBase + "?token=" + tokenString;
+            emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
+        });
+    }
+
+    @Transactional
+    public void resetPassword(String tokenString, String newPassword) {
+        PasswordResetToken token = tokenRepository.findByToken(tokenString)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired reset token"));
+                
+        if (token.isExpired()) {
+            throw new IllegalArgumentException("Invalid or expired reset token");
+        }
+        
+        User user = token.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        
+        tokenRepository.delete(token);
     }
 }
