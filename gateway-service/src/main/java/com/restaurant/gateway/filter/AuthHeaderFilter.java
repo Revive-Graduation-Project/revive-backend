@@ -34,6 +34,8 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
             "/auth/login",
             "/auth/signup",
             "/auth/refresh",
+            "/auth/password/reset-request",
+            "/auth/password/reset",
             "/actuator/health",
             "/v3/api-docs",
             "/auth/v3/api-docs",
