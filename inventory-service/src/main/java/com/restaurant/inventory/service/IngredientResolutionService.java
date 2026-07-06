@@ -55,7 +55,7 @@ public class IngredientResolutionService {
                     .orElse(null);
 
             if (food == null) {
-                return new IngredientNutrition(originalEntry.name(), originalEntry.quantity(), originalEntry.unit(), null, "", "", null);
+                return new IngredientNutrition(originalEntry.name(), originalEntry.quantity(), originalEntry.unit(), -1, "", "", null);
             }
 
             return new IngredientNutrition(
