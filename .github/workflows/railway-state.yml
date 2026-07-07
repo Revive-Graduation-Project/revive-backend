@@ -46,7 +46,7 @@ jobs:
           )
           for SERVICE_ID in "${SERVICES[@]}"; do
             echo "Stopping service: $SERVICE_ID"
-            railway down --yes --service "$SERVICE_ID"
+            railway down --yes --service "$SERVICE_ID" || true
           done
 
       - name: Railway Up (all services)
