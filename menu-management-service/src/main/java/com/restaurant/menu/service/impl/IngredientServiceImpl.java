@@ -20,6 +20,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import com.restaurant.menu.client.InventoryClient;
+import com.restaurant.menu.dto.IngredientEntry;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,6 +40,7 @@ public class IngredientServiceImpl implements IngredientService {
     private final IngredientMapper ingredientMapper;
     private final MealRepository mealRepository;
     private final MealMapper mealMapper;
+    private final InventoryClient inventoryClient;
 
     @Override
     @Transactional
@@ -75,6 +80,43 @@ public class IngredientServiceImpl implements IngredientService {
         Ingredient ingredient = ingredientRepository.findById(id)
                 .orElseThrow(() -> new IngredientNotFoundException(id));
         return ingredientMapper.toDTO(ingredient);
+    }
+
+    @Override
+    @Transactional
+    public IngredientDTO createIngredient(String name) {
+        log.info("Creating new ingredient via API: {}", name);
+        if (ingredientRepository.findByName(name).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ingredient already exists: " + name);
+        }
+
+        List<IngredientNutrition> resolved = inventoryClient.resolveIngredients(
+                List.of(new IngredientEntry(name, 0.0, ""))
+        );
+
+        if (resolved == null || resolved.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not resolve ingredient from USDA");
+        }
+
+        IngredientNutrition nutrition = resolved.get(0);
+        
+        // USDA might return a different name, check again
+        if (!name.equals(nutrition.ingredientName()) && ingredientRepository.findByName(nutrition.ingredientName()).isPresent()) {
+             throw new ResponseStatusException(HttpStatus.CONFLICT, "Resolved USDA ingredient already exists: " + nutrition.ingredientName());
+        }
+
+        Ingredient ingredient = resolveOrSaveIngredient(nutrition);
+        return ingredientMapper.toDTO(ingredient);
+    }
+
+    @Override
+    @Transactional
+    public void deleteIngredient(Long id) {
+        log.info("Deleting ingredient with id: {}", id);
+        if (!ingredientRepository.existsById(id)) {
+            throw new IngredientNotFoundException(id);
+        }
+        ingredientRepository.deleteById(id);
     }
 
     @Override

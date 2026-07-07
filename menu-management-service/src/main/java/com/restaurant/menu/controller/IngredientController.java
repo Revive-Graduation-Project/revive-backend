@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @RestController
@@ -33,6 +34,32 @@ public class IngredientController {
     @GetMapping("/{id}")
     public ResponseEntity<IngredientDTO> getIngredientById(@PathVariable Long id) {
         return ResponseEntity.ok(ingredientService.getIngredientById(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<?> createIngredient(
+            @RequestBody Map<String, String> requestBody,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role))
+            return forbidden(role);
+        
+        String name = requestBody.get("name");
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Ingredient name is required");
+        }
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(ingredientService.createIngredient(name.trim()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteIngredient(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAuthorized(role))
+            return forbidden(role);
+            
+        ingredientService.deleteIngredient(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/stock")

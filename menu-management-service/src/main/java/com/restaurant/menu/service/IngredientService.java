@@ -27,6 +27,16 @@ public interface IngredientService {
     IngredientDTO getIngredientById(Long id);
 
     /**
+     * Creates a new ingredient by resolving its nutrition via inventory-service.
+     */
+    IngredientDTO createIngredient(String name);
+
+    /**
+     * Deletes an ingredient by its ID.
+     */
+    void deleteIngredient(Long id);
+
+    /**
      * Updates the stock quantity for a single ingredient.
      */
     IngredientDTO updateStock(Long id, Double stock);
