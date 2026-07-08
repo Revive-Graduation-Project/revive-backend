@@ -47,6 +47,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/kitchen/tickets/**").hasAnyRole("CHEF" , "ADMIN")
                         .requestMatchers("/api/kitchen/chefs/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
