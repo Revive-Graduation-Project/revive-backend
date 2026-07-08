@@ -49,7 +49,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/orders/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/orders/**").hasRole("CLIENT")
+                        .requestMatchers("/api/orders/**").hasAnyRole("CLIENT", "ADMIN")
                         .anyRequest().authenticated()
                 )
 
