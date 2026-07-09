@@ -2,6 +2,7 @@ package com.restaurant.order.service.impl;
 
 import com.restaurant.order.client.MenuClient;
 import com.restaurant.order.client.PaymentServiceClient;
+import com.restaurant.order.dto.IngredientDTO;
 import com.restaurant.order.dto.request.OrderItemRequest;
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
@@ -36,6 +37,7 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -422,8 +424,8 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
     }
 
-    private MealPriceSnapshot calculateCustomMealPrice(Map<String, Object> customizations, Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap) {
-        java.math.BigDecimal totalPrice = java.math.BigDecimal.ZERO;
+    private MealPriceSnapshot calculateCustomMealPrice(Map<String, Object> customizations, Map<Long, IngredientDTO> ingredientMap) {
+        BigDecimal totalPrice = BigDecimal.ZERO;
         String name = "Custom Meal";
 
         try {
@@ -433,7 +435,7 @@ public class OrderServiceImpl implements OrderService {
                 Long primaryId = Long.valueOf(primary.get("id").toString());
                 com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(primaryId);
                 if (ing != null) {
-                    totalPrice = totalPrice.add(java.math.BigDecimal.valueOf(ing.price()));
+                    totalPrice = totalPrice.add(BigDecimal.valueOf(ing.price()));
                     name = "Custom " + ing.name() + " Meal";
                 }
             }
@@ -447,7 +449,7 @@ public class OrderServiceImpl implements OrderService {
                     Double grams = Double.valueOf(add.get("grams").toString());
                     com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(addId);
                     if (ing != null) {
-                        java.math.BigDecimal additionPrice = java.math.BigDecimal.valueOf(ing.price()).multiply(java.math.BigDecimal.valueOf(grams));
+                        BigDecimal additionPrice = BigDecimal.valueOf(ing.price()).multiply(BigDecimal.valueOf(grams));
                         totalPrice = totalPrice.add(additionPrice);
                     }
                 }
@@ -456,7 +458,7 @@ public class OrderServiceImpl implements OrderService {
             log.error("Failed to parse customizations for price calculation", e);
             throw new MenuServiceException("Invalid customization data");
         }
-        totalPrice = totalPrice.setScale(2, java.math.RoundingMode.HALF_UP);
+        totalPrice = totalPrice.setScale(2, RoundingMode.HALF_UP);
         return new MealPriceSnapshot(null, name, totalPrice.doubleValue(), null);
     }
 
@@ -472,7 +474,7 @@ public class OrderServiceImpl implements OrderService {
 
     private void createPaymentIntentSync(Order order) {
         PaymentServiceClient.PaymentIntentResponse response = paymentServiceClient.createPaymentIntent(
-                order.getId(), order.getClientId(), order.getTotalPrice(), "egp");
+                order.getId(), order.getClientId(), order.getTotalPrice(), "usd");
         order.setStripePaymentIntentId(response.paymentIntentId());
         order.setStripeClientSecret(response.clientSecret());
     }
