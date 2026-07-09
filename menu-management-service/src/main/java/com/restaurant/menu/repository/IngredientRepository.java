@@ -15,6 +15,10 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
 
     Optional<Ingredient> findByName(String name);
 
+    List<Ingredient> findByCategory(String category);
+
+    List<Ingredient> findByCategoryAndStockGreaterThan(String category, Double stock);
+
     /**
      * Fetches ingredients by their IDs with a PESSIMISTIC_WRITE lock
      * (translates to SELECT ... FOR UPDATE in PostgreSQL).

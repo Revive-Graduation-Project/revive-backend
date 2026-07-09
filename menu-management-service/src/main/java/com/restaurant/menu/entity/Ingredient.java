@@ -39,6 +39,10 @@ public class Ingredient {
     @Column(name = "stock", nullable = false)
     private Double stock = 0.0; // stored in grams
 
+    @Builder.Default
+    @Column(name = "price", nullable = false)
+    private Double price = 0.0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

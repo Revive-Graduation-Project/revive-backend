@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface MenuClient {
     MealPriceSnapshot getMealById(Long mealId);
+    List<com.restaurant.order.dto.IngredientDTO> getAllIngredients();
     void reserveStock(List<OrderItemRequest> items);
     void rollbackStock(List<OrderItemRequest> items);
 }
