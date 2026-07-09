@@ -41,6 +41,18 @@ public class MenuServiceClient implements MenuClient {
     }
 
     @Override
+    public List<com.restaurant.order.dto.IngredientDTO> getAllIngredients() {
+        log.info("Fetching all ingredients from menu-service for price calculation");
+        return restClient.get()
+                .uri("/api/ingredients")
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (request, response) -> {
+                    throw new MenuServiceException("Failed to fetch ingredients from menu service");
+                })
+                .body(new org.springframework.core.ParameterizedTypeReference<List<com.restaurant.order.dto.IngredientDTO>>() {});
+    }
+
+    @Override
     public void reserveStock(List<OrderItemRequest> items) {
         log.info("Reserving stock in menu-service for {} items...", items.size());
         restClient.post()
