@@ -47,6 +47,11 @@ spring:
           predicates:
             - Path=/api/ingredients/**
 
+        - id: menu-service-customizations
+          uri: ${MENU_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/customizations/**
+
         # ── Kitchen Service ────────────────────────────────────────────
         - id: kitchen-service
           uri: ${KITCHEN_SERVICE_URL:http://localhost:8086}
@@ -144,6 +149,11 @@ spring:
           predicates:
             - Path=/api/ingredients/**
 
+        - id: menu-service-customizations
+          uri: http://menu-management-service:8080
+          predicates:
+            - Path=/api/customizations/**
+
         # ── Kitchen Service ────────────────────────────────────────────
         - id: kitchen-service
           uri: http://kitchen-service:8080
@@ -200,6 +210,11 @@ spring:
           uri: http://menu-management-service.railway.internal:8080
           predicates:
             - Path=/api/ingredients/**
+
+        - id: menu-service-customizations
+          uri: http://menu-management-service.railway.internal:8080
+          predicates:
+            - Path=/api/customizations/**
 
         - id: kitchen-service
           uri: http://kitchen-service.railway.internal:8080
