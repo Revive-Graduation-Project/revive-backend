@@ -102,7 +102,9 @@ public class UsdaService {
                                         String description = (String) food.get("description");
 
                                         Map foodCategory = (Map) food.get("foodCategory");
-                                        String categoryDescription = foodCategory != null ? (String) foodCategory.get("description") : "Other";
+                                        String categoryDescription = foodCategory != null
+                                                        ? (String) foodCategory.get("description")
+                                                        : "Other";
 
                                         // quantity in grams for this ingredient — used to scale nutrients from per 100g
                                         double quantity = quantityMap.getOrDefault(searchResult.originalName(), 100.0);
@@ -112,12 +114,10 @@ public class UsdaService {
                                         List<NutrientInfo> nutrients = rawNutrients == null ? List.of()
                                                         : rawNutrients.stream()
                                                                         .map(n -> {
-                                                                                String nutrientName = n.containsKey("nutrient") ? 
-                                                                                        (String) ((Map) n.get("nutrient")).get("name") : 
-                                                                                        (String) n.get("name");
-                                                                                String unitName = n.containsKey("nutrient") ? 
-                                                                                        (String) ((Map) n.get("nutrient")).get("unitName") : 
-                                                                                        (String) n.get("unitName");
+                                                                                String nutrientName = n.containsKey(
+                                                                                                "nutrient") ? (String) ((Map) n.get("nutrient")).get("name") : (String) n.get("name");
+                                                                                String unitName = n.containsKey(
+                                                                                                "nutrient") ? (String) ((Map) n.get("nutrient")).get("unitName") : (String) n.get("unitName");
                                                                                 double value = n.get(
                                                                                                 "amount") instanceof Number
                                                                                                                 ? ((Number) n.get(
@@ -135,10 +135,12 @@ public class UsdaService {
                                                                         .filter(n -> RELEVANT_NUTRIENTS
                                                                                         .contains(n.nutrientName()))
                                                                         .filter(n -> !(n.nutrientName().equals("Energy")
-                                                                                        && n.unitName().equals("kJ"))) // exclude kJ
+                                                                                        && n.unitName().equals("kJ"))) // exclude
+                                                                                                                       // kJ
                                                                         .toList();
 
-                                        return new UsdaFoodDetail(searchResult.fdcId(), searchResult.originalName(), description, categoryDescription, nutrients);
+                                        return new UsdaFoodDetail(searchResult.fdcId(), searchResult.originalName(),
+                                                        description, categoryDescription, nutrients);
                                 })
                                 .filter(f -> f != null)
                                 .toList();

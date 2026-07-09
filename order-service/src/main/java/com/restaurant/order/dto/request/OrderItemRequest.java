@@ -6,8 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record OrderItemRequest(
-        @NotNull(message = "Meal ID is required")
         Long mealId,
+
+        java.util.Map<String, Object> customizations,
 
         @Min(value = 1, message = "Quantity must be at least 1")
         int quantity

@@ -27,8 +27,12 @@ public class OrderItem {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @Column(name = "meal_id", nullable = false)
+    @Column(name = "meal_id", nullable = true)
     private Long mealId;
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private java.util.Map<String, Object> customizations;
 
     @Column(name = "snapshot_name", nullable = false)
     private String snapshotName;

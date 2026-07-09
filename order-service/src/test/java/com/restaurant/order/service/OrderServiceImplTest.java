@@ -59,7 +59,7 @@ class OrderServiceImplTest {
     @Test
     void placeOrder_withValidPoints_fetchesPriceAndSavesOrder() {
         Long mealId = 1L;
-        OrderItemRequest itemReq = new OrderItemRequest(mealId, 2);
+        OrderItemRequest itemReq = new OrderItemRequest(mealId, null, 2);
         // Using CREDIT_CARD as requested
         PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), 100, PaymentMethod.CREDIT_CARD);
 
