@@ -9,6 +9,6 @@ import java.math.BigDecimal;
 public record MealPriceSnapshot(
         Long id,
         String name,
-        BigDecimal price,
+        Double price,
         String imageUrl
 ) {}

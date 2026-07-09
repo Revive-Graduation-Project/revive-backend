@@ -35,7 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -79,7 +81,7 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         // 2. Fetch price snapshots one by one (Outside of DB transaction)
-        java.util.Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap = null;
+        Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap = null;
         boolean hasCustomMeals = request.items().stream().anyMatch(i -> i.mealId() == null);
         if (hasCustomMeals) {
             ingredientMap = menuClient.getAllIngredients().stream()
@@ -90,11 +92,13 @@ public class OrderServiceImpl implements OrderService {
             try {
                 if (itemReq.mealId() != null) {
                     MealPriceSnapshot meal = menuClient.getMealById(itemReq.mealId());
+                    // Convert Double to BigDecimal immediately for the Database Entity
+                    BigDecimal safePrice = meal.price() != null ? BigDecimal.valueOf(meal.price()) : BigDecimal.ZERO;
                     order.getItems().add(OrderItem.builder()
                             .order(order)
                             .mealId(meal.id())
                             .snapshotName(meal.name())
-                            .snapshotPrice(meal.price())
+                            .snapshotPrice(safePrice)
                             .snapshotImageUrl(meal.imageUrl())
                             .quantity(itemReq.quantity())
                             .build());
@@ -103,12 +107,14 @@ public class OrderServiceImpl implements OrderService {
                         throw new MenuServiceException("Customizations cannot be empty for custom meal");
                     }
                     MealPriceSnapshot meal = calculateCustomMealPrice(itemReq.customizations(), ingredientMap);
+                    // Convert Double to BigDecimal immediately for the Database Entity
+                    BigDecimal safePrice = meal.price() != null ? BigDecimal.valueOf(meal.price()) : BigDecimal.ZERO;
                     order.getItems().add(OrderItem.builder()
                             .order(order)
                             .mealId(null)
                             .customizations(itemReq.customizations())
                             .snapshotName(meal.name())
-                            .snapshotPrice(meal.price())
+                            .snapshotPrice(safePrice)
                             .snapshotImageUrl(meal.imageUrl())
                             .quantity(itemReq.quantity())
                             .build());
@@ -416,13 +422,13 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
     }
 
-    private MealPriceSnapshot calculateCustomMealPrice(java.util.Map<String, Object> customizations, java.util.Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap) {
+    private MealPriceSnapshot calculateCustomMealPrice(Map<String, Object> customizations, Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap) {
         java.math.BigDecimal totalPrice = java.math.BigDecimal.ZERO;
         String name = "Custom Meal";
 
         try {
             // primary
-            java.util.Map<String, Object> primary = (java.util.Map<String, Object>) customizations.get("primary");
+            Map<String, Object> primary = (Map<String, Object>) customizations.get("primary");
             if (primary != null && primary.get("id") != null) {
                 Long primaryId = Long.valueOf(primary.get("id").toString());
                 com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(primaryId);
@@ -433,9 +439,9 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // additions
-            List<java.util.Map<String, Object>> additions = (List<java.util.Map<String, Object>>) customizations.get("additions");
+            List<Map<String, Object>> additions = (List<Map<String, Object>>) customizations.get("additions");
             if (additions != null) {
-                for (java.util.Map<String, Object> add : additions) {
+                for (Map<String, Object> add : additions) {
                     if (add.get("id") == null || add.get("grams") == null) continue;
                     Long addId = Long.valueOf(add.get("id").toString());
                     Double grams = Double.valueOf(add.get("grams").toString());
@@ -450,8 +456,8 @@ public class OrderServiceImpl implements OrderService {
             log.error("Failed to parse customizations for price calculation", e);
             throw new MenuServiceException("Invalid customization data");
         }
-
-        return new MealPriceSnapshot(null, name, totalPrice, null);
+        totalPrice = totalPrice.setScale(2, java.math.RoundingMode.HALF_UP);
+        return new MealPriceSnapshot(null, name, totalPrice.doubleValue(), null);
     }
 
     private void publishOrderCreatedEvent(Order order) {
