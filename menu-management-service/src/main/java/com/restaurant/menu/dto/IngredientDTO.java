@@ -19,5 +19,8 @@ public record IngredientDTO(
         List<Map<String, Object>> nutrients,
 
         @PositiveOrZero(message = "Stock cannot be negative")
-        Double stock) { // in grams
+        Double stock, // in grams
+        
+        @PositiveOrZero(message = "Price cannot be negative")
+        Double price) {
 }

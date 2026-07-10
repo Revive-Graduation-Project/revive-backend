@@ -79,20 +79,43 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         // 2. Fetch price snapshots one by one (Outside of DB transaction)
+        java.util.Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap = null;
+        boolean hasCustomMeals = request.items().stream().anyMatch(i -> i.mealId() == null);
+        if (hasCustomMeals) {
+            ingredientMap = menuClient.getAllIngredients().stream()
+                    .collect(Collectors.toMap(com.restaurant.order.dto.IngredientDTO::id, i -> i));
+        }
+
         for (OrderItemRequest itemReq : request.items()) {
             try {
-                MealPriceSnapshot meal = menuClient.getMealById(itemReq.mealId());
-                order.getItems().add(OrderItem.builder()
-                        .order(order)
-                        .mealId(meal.id())
-                        .snapshotName(meal.name())
-                        .snapshotPrice(meal.price())
-                        .snapshotImageUrl(meal.imageUrl())
-                        .quantity(itemReq.quantity())
-                        .build());
+                if (itemReq.mealId() != null) {
+                    MealPriceSnapshot meal = menuClient.getMealById(itemReq.mealId());
+                    order.getItems().add(OrderItem.builder()
+                            .order(order)
+                            .mealId(meal.id())
+                            .snapshotName(meal.name())
+                            .snapshotPrice(meal.price())
+                            .snapshotImageUrl(meal.imageUrl())
+                            .quantity(itemReq.quantity())
+                            .build());
+                } else {
+                    if (itemReq.customizations() == null || itemReq.customizations().isEmpty()) {
+                        throw new MenuServiceException("Customizations cannot be empty for custom meal");
+                    }
+                    MealPriceSnapshot meal = calculateCustomMealPrice(itemReq.customizations(), ingredientMap);
+                    order.getItems().add(OrderItem.builder()
+                            .order(order)
+                            .mealId(null)
+                            .customizations(itemReq.customizations())
+                            .snapshotName(meal.name())
+                            .snapshotPrice(meal.price())
+                            .snapshotImageUrl(meal.imageUrl())
+                            .quantity(itemReq.quantity())
+                            .build());
+                }
             } catch (Exception e) {
-                log.error("Failed to fetch meal from Menu Service for ID: {}", itemReq.mealId(), e);
-                throw new MenuServiceException("Meal not found or Menu Service unavailable for ID: " + itemReq.mealId());
+                log.error("Failed to process item: {}", itemReq, e);
+                throw new MenuServiceException("Failed to process item or Menu Service unavailable");
             }
         }
 
@@ -388,8 +411,47 @@ public class OrderServiceImpl implements OrderService {
 
     private List<OrderItemRequest> buildItemRequests(Order order) {
         return order.getItems().stream()
-                .map(item -> new OrderItemRequest(item.getMealId(), item.getQuantity()))
+                .filter(item -> item.getMealId() != null) // Filter out custom meals for stock reservation
+                .map(item -> new OrderItemRequest(item.getMealId(), null, item.getQuantity()))
                 .toList();
+    }
+
+    private MealPriceSnapshot calculateCustomMealPrice(java.util.Map<String, Object> customizations, java.util.Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap) {
+        java.math.BigDecimal totalPrice = java.math.BigDecimal.ZERO;
+        String name = "Custom Meal";
+
+        try {
+            // primary
+            java.util.Map<String, Object> primary = (java.util.Map<String, Object>) customizations.get("primary");
+            if (primary != null && primary.get("id") != null) {
+                Long primaryId = Long.valueOf(primary.get("id").toString());
+                com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(primaryId);
+                if (ing != null) {
+                    totalPrice = totalPrice.add(java.math.BigDecimal.valueOf(ing.price()));
+                    name = "Custom " + ing.name() + " Meal";
+                }
+            }
+
+            // additions
+            List<java.util.Map<String, Object>> additions = (List<java.util.Map<String, Object>>) customizations.get("additions");
+            if (additions != null) {
+                for (java.util.Map<String, Object> add : additions) {
+                    if (add.get("id") == null || add.get("grams") == null) continue;
+                    Long addId = Long.valueOf(add.get("id").toString());
+                    Double grams = Double.valueOf(add.get("grams").toString());
+                    com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(addId);
+                    if (ing != null) {
+                        java.math.BigDecimal additionPrice = java.math.BigDecimal.valueOf(ing.price()).multiply(java.math.BigDecimal.valueOf(grams));
+                        totalPrice = totalPrice.add(additionPrice);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse customizations for price calculation", e);
+            throw new MenuServiceException("Invalid customization data");
+        }
+
+        return new MealPriceSnapshot(null, name, totalPrice, null);
     }
 
     private void publishOrderCreatedEvent(Order order) {
