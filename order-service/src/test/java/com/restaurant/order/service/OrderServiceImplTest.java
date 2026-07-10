@@ -52,6 +52,14 @@ class OrderServiceImplTest {
                 menuClient,
                 paymentServiceClient
         );
+        // Set self field for transactional method calls
+        try {
+            java.lang.reflect.Field selfField = OrderServiceImpl.class.getDeclaredField("self");
+            selfField.setAccessible(true);
+            selfField.set(orderService, orderService);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set self field", e);
+        }
     }
 
     // ── Tests ────────────────────────────────────────────────────
@@ -63,7 +71,7 @@ class OrderServiceImplTest {
         // Using CREDIT_CARD as requested
         PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), 100, PaymentMethod.CREDIT_CARD);
 
-        when(menuClient.getMealById(mealId)).thenReturn(new MealPriceSnapshot(mealId, "Test Meal", BigDecimal.valueOf(9.99), "http://example.com/image.jpg"));
+        when(menuClient.getMealById(mealId)).thenReturn(new MealPriceSnapshot(mealId, "Test Meal", BigDecimal.valueOf(9.99).doubleValue(), "http://example.com/image.jpg"));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(1L);
