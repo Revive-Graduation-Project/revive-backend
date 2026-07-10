@@ -45,63 +45,85 @@ public class MealServiceImpl implements MealService {
         log.info("Processing nutrition data for {} meals", event.meals().size());
 
         for (MealNutrition mealNutrition : event.meals()) {
-            Map<String, NutrientInfo> aggregatedNutrients = new LinkedHashMap<>();
+            try {
+                Map<String, NutrientInfo> aggregatedNutrients = new LinkedHashMap<>();
 
-            // 1. Resolve Meal first (or prepare for creation)
-            Meal meal = mealRepository.findByName(mealNutrition.mealName())
-                    .orElseGet(() -> Meal.builder()
-                            .name(mealNutrition.mealName())
-                            .description(mealNutrition.description())
-                            .isActive(false) // newly imported meals are inactive until a photo is uploaded
+                // 1. Resolve Meal first (or prepare for creation)
+                Meal meal;
+                try {
+                    meal = mealRepository.findByName(mealNutrition.mealName())
+                            .orElseGet(() -> Meal.builder()
+                                    .name(mealNutrition.mealName())
+                                    .description(mealNutrition.description())
+                                    .isActive(false) // newly imported meals are inactive until a photo is uploaded
+                                    .build());
+                } catch (Exception e) {
+                    throw new RuntimeException("Saga Step A Failed: Could not resolve meal '" + mealNutrition.mealName() + "' - " + e.getMessage(), e);
+                }
+
+                meal.setCategory(mealNutrition.category());
+                meal.setPrice(mealNutrition.price());
+                meal.setDescription(mealNutrition.description());
+
+                List<MealIngredient> mealIngredients = new ArrayList<>();
+
+                for (IngredientNutrition ingDto : mealNutrition.ingredients()) {
+                    // Resolve Ingredient Entity
+                    Ingredient ingredient;
+                    try {
+                        ingredient = ingredientService.resolveOrSaveIngredient(ingDto);
+                    } catch (Exception e) {
+                        throw new RuntimeException("Saga Step B Failed: Could not resolve ingredient '" + ingDto.name() + "' for meal '" + mealNutrition.mealName() + "' - " + e.getMessage(), e);
+                    }
+
+                    mealIngredients.add(MealIngredient.builder()
+                            .meal(meal)
+                            .ingredient(ingredient)
+                            .quantityGrams(ingDto.quantity())
                             .build());
 
-            meal.setCategory(mealNutrition.category());
-            meal.setPrice(mealNutrition.price());
-            meal.setDescription(mealNutrition.description());
-
-            List<MealIngredient> mealIngredients = new ArrayList<>();
-
-            for (IngredientNutrition ingDto : mealNutrition.ingredients()) {
-                // Resolve Ingredient Entity
-                Ingredient ingredient = ingredientService.resolveOrSaveIngredient(ingDto);
-
-                mealIngredients.add(MealIngredient.builder()
-                        .meal(meal)
-                        .ingredient(ingredient)
-                        .quantityGrams(ingDto.quantity())
-                        .build());
-
-                // Aggregate Nutrients
-                for (NutrientInfo nutrient : ingDto.nutrients()) {
-                    aggregatedNutrients.merge(
-                            nutrient.nutrientName() + "_" + nutrient.unitName(),
-                            nutrient,
-                            (existing, incoming) -> new NutrientInfo(
-                                    existing.nutrientName(),
-                                    Math.round((existing.value() + incoming.value()) * 100.0) / 100.0,
-                                    existing.unitName()));
+                    // Aggregate Nutrients
+                    for (NutrientInfo nutrient : ingDto.nutrients()) {
+                        aggregatedNutrients.merge(
+                                nutrient.nutrientName() + "_" + nutrient.unitName(),
+                                nutrient,
+                                (existing, incoming) -> new NutrientInfo(
+                                        existing.nutrientName(),
+                                        Math.round((existing.value() + incoming.value()) * 100.0) / 100.0,
+                                        existing.unitName()));
+                    }
                 }
+
+                // Convert aggregated to List<Map>
+                List<Map<String, Object>> finalMealNutrients = aggregatedNutrients.values().stream()
+                        .map(n -> Map.<String, Object>of(
+                                "nutrientName", n.nutrientName(),
+                                "value", n.value(),
+                                "unitName", n.unitName()))
+                        .toList();
+
+                meal.setNutrients(finalMealNutrients);
+
+                // Set ingredients - orphanRemoval=true in Meal entity will handle old ones
+                if (meal.getMealIngredients() != null) {
+                    meal.getMealIngredients().clear();
+                    meal.getMealIngredients().addAll(mealIngredients);
+                } else {
+                    meal.setMealIngredients(mealIngredients);
+                }
+
+                try {
+                    mealRepository.save(meal);
+                } catch (Exception e) {
+                    throw new RuntimeException("Saga Step C Failed: Could not save meal '" + mealNutrition.mealName() + "' - " + e.getMessage(), e);
+                }
+            } catch (RuntimeException re) {
+                log.error("Failed processing nutrition event for meal '{}': {}", mealNutrition.mealName(), re.getMessage(), re);
+                throw re;
+            } catch (Exception e) {
+                log.error("Unexpected error processing nutrition event for meal '{}': {}", mealNutrition.mealName(), e.getMessage(), e);
+                throw new RuntimeException("Saga Processing Failed: " + e.getMessage(), e);
             }
-
-            // Convert aggregated to List<Map>
-            List<Map<String, Object>> finalMealNutrients = aggregatedNutrients.values().stream()
-                    .map(n -> Map.<String, Object>of(
-                            "nutrientName", n.nutrientName(),
-                            "value", n.value(),
-                            "unitName", n.unitName()))
-                    .toList();
-
-            meal.setNutrients(finalMealNutrients);
-
-            // Set ingredients - orphanRemoval=true in Meal entity will handle old ones
-            if (meal.getMealIngredients() != null) {
-                meal.getMealIngredients().clear();
-                meal.getMealIngredients().addAll(mealIngredients);
-            } else {
-                meal.setMealIngredients(mealIngredients);
-            }
-
-            mealRepository.save(meal);
         }
 
         log.info("Successfully persisted {} meals", event.meals().size());
