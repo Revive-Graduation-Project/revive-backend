@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MenuServiceException.class)
     public ResponseEntity<ErrorResponse> handleMenuServiceError(MenuServiceException e) {
         log.error("Menu service error: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(new ErrorResponse(e.getMessage(), Instant.now()));
     }
 

@@ -86,9 +86,6 @@
         <module name="auth-service" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="restaurant-microservices" target="17" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
