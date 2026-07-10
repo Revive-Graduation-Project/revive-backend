@@ -49,8 +49,18 @@ public class MenuCsvService {
      * 5. Publish the MenuNutritionEvent to RabbitMQ
      */
     public List<MealNutrition> getMenuNutritions(MultipartFile file) {
-        csvParserHelper.validateFile(file);
-        LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap = csvParserHelper.parseMenu(file);
+        try {
+            csvParserHelper.validateFile(file);
+        } catch (Exception e) {
+            throw new RuntimeException("Step 1 Failed: CSV Validation Error - " + e.getMessage(), e);
+        }
+        
+        LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap;
+        try {
+            menuMap = csvParserHelper.parseMenu(file);
+        } catch (Exception e) {
+            throw new RuntimeException("Step 2 Failed: CSV Parsing Error - " + e.getMessage(), e);
+        }
 
         List<MealNutrition> result = new ArrayList<>();
 
@@ -63,9 +73,14 @@ public class MenuCsvService {
                     .distinct()
                     .toList();
 
-            final Map<String, NormalizedIngredient> normalizedCache = allUniqueIngredients.isEmpty()
-                    ? Map.of()
-                    : batchNormalizeIngredients(allUniqueIngredients);
+            final Map<String, NormalizedIngredient> normalizedCache;
+            try {
+                normalizedCache = allUniqueIngredients.isEmpty()
+                        ? Map.of()
+                        : batchNormalizeIngredients(allUniqueIngredients);
+            } catch (Exception e) {
+                throw new RuntimeException("Step 3 Failed: AI Normalization Error - " + e.getMessage(), e);
+            }
 
             if (!normalizedCache.isEmpty()) {
                 log.info("Successfully normalized {} unique ingredients via AI", normalizedCache.size());
@@ -87,25 +102,35 @@ public class MenuCsvService {
                 Map<String, Double> quantityMap = ingredients.stream()
                         .collect(Collectors.toMap(IngredientEntry::name, IngredientEntry::quantity));
 
-                List<UsdaFoodDetail> foodDetails = usdaService.fetchNutrients(normalized, quantityMap);
+                List<UsdaFoodDetail> foodDetails;
+                try {
+                    foodDetails = usdaService.fetchNutrients(normalized, quantityMap);
+                } catch (Exception e) {
+                    throw new RuntimeException("Step 4 Failed: USDA API Fetch Error for meal '" + mealName + "' - " + e.getMessage(), e);
+                }
 
                 // ── Step 4: Map to IngredientNutrition ─────────────────────
-                List<IngredientNutrition> ingredientNutritions = foodDetails.stream().map(food -> {
-                    // Find original entry for quantity and unit
-                    IngredientEntry originalEntry = ingredients.stream()
-                            .filter(i -> i.name().equals(food.originalName()))
-                            .findFirst()
-                            .orElse(new IngredientEntry(food.originalName(), 0, ""));
+                List<IngredientNutrition> ingredientNutritions;
+                try {
+                    ingredientNutritions = foodDetails.stream().map(food -> {
+                        // Find original entry for quantity and unit
+                        IngredientEntry originalEntry = ingredients.stream()
+                                .filter(i -> i.name().equals(food.originalName()))
+                                .findFirst()
+                                .orElse(new IngredientEntry(food.originalName(), 0, ""));
 
-                    return new IngredientNutrition(
-                            food.originalName(),
-                            originalEntry.quantity(),
-                            originalEntry.unit(),
-                            food.fdcId(),
-                            food.description(),
-                            food.foodCategory(),
-                            food.foodNutrients());
-                }).toList();
+                        return new IngredientNutrition(
+                                food.originalName(),
+                                originalEntry.quantity(),
+                                originalEntry.unit(),
+                                food.fdcId(),
+                                food.description(),
+                                food.foodCategory(),
+                                food.foodNutrients());
+                    }).toList();
+                } catch (Exception e) {
+                    throw new RuntimeException("Step 5 Failed: Ingredient Mapping Error for meal '" + mealName + "' - " + e.getMessage(), e);
+                }
 
                 MealNutrition mealNutrition = new MealNutrition(
                         mealName,
@@ -120,13 +145,20 @@ public class MenuCsvService {
 
             // ── Step 5: Publish event (only reached if ALL meals succeeded) ──
             log.info("Processed {} meals from '{}' — publishing event", result.size(), file.getOriginalFilename());
-            menuNutritionPublisher.publish(new MenuNutritionEvent(result));
+            try {
+                menuNutritionPublisher.publish(new MenuNutritionEvent(result));
+            } catch (Exception e) {
+                throw new RuntimeException("Step 6 Failed: RabbitMQ Publish Error - " + e.getMessage(), e);
+            }
 
             return result;
 
+        } catch (RuntimeException re) {
+            log.error("Pipeline failed — no event published. Cause: {}", re.getMessage(), re);
+            throw re;
         } catch (Exception e) {
             log.error("Pipeline failed — no event published. Cause: {}", e.getMessage(), e);
-            throw new RuntimeException("Menu nutrition pipeline failed: " + e.getMessage(), e);
+            throw new RuntimeException("Menu nutrition pipeline failed with unknown error: " + e.getMessage(), e);
         }
     }
 
