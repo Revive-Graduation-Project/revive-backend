@@ -57,7 +57,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     @Lazy
-    private OrderServiceImpl self = this;
+    // Self-injection via proxy to ensure local method calls
+    // respect @Transactional boundaries without breaking startup
+    // Do NOT assign it to 'this'
+    private OrderServiceImpl self;
 
     public record CancelResult(OrderStatus previousStatus, Order order) {}
 
