@@ -122,10 +122,11 @@ public class OrderDomainService {
             if (primary != null && primary.get("id") != null) {
                 Long primaryId = Long.valueOf(primary.get("id").toString());
                 IngredientDTO ing = ingredientMap.get(primaryId);
-                if (ing != null) {
-                    totalPrice = totalPrice.add(BigDecimal.valueOf(ing.price()));
-                    name = "Custom " + ing.name() + " Meal";
+                if (ing == null) {
+                    throw new MenuServiceException("Ingredient not found for primary ID: " + primaryId);
                 }
+                totalPrice = totalPrice.add(BigDecimal.valueOf(ing.price()));
+                name = "Custom " + ing.name() + " Meal";
             }
 
             @SuppressWarnings("unchecked")
@@ -137,11 +138,12 @@ public class OrderDomainService {
                     Long addId = Long.valueOf(add.get("id").toString());
                     Double grams = Double.valueOf(add.get("grams").toString());
                     IngredientDTO ing = ingredientMap.get(addId);
-                    if (ing != null) {
-                        totalPrice = totalPrice.add(
-                                BigDecimal.valueOf(ing.price())
-                                          .multiply(BigDecimal.valueOf(grams)));
+                    if (ing == null) {
+                        throw new MenuServiceException("Ingredient not found for addition ID: " + addId);
                     }
+                    totalPrice = totalPrice.add(
+                            BigDecimal.valueOf(ing.price())
+                                      .multiply(BigDecimal.valueOf(grams)));
                 }
             }
         } catch (MenuServiceException e) {
