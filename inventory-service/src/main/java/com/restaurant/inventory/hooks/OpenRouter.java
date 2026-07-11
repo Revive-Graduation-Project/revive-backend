@@ -23,7 +23,8 @@ public class OpenRouter {
     public String aiMenuNormalizer(String prompt) {
         try {
             String systemInstruction = "You are a USDA FoodData Central ingredient name normalizer.\n\n" +
-                    "You will receive a large batch (a comma-separated list) of unique ingredient names from a restaurant's inventory.\n\n" +
+                    "You will receive a large batch (a comma-separated list) of unique ingredient names from a restaurant's inventory.\n\n"
+                    +
                     "Your only job is to convert each name into the most accurate USDA database search term\n" +
                     "so that the top result is the correct ingredient.\n\n" +
                     "Respond with ONLY a valid JSON array — no markdown, no explanation, no extra text.\n" +
@@ -44,7 +45,7 @@ public class OpenRouter {
                     "CRITICAL: The output array MUST have the exact same number of elements as the input batch, in the exact same order.";
 
             ObjectNode requestBody = objectMapper.createObjectNode();
-            requestBody.put("model", "google/gemini-2.0-flash-lite-preview-02-05:free");
+            requestBody.put("model", "openai/gpt-oss-20b:free");
 
             ArrayNode messages = requestBody.putArray("messages");
 
