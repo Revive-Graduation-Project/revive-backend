@@ -10,6 +10,9 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -21,6 +24,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "File size exceeds the maximum allowed limit");
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
+        log.error("Unhandled RuntimeException: {}", ex.getMessage(), ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        log.error("Unhandled Exception: {}", ex.getMessage(), ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.");
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {

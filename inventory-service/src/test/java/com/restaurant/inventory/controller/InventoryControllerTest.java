@@ -76,4 +76,50 @@ public class InventoryControllerTest {
                 .andExpect(jsonPath("$[0].ingredients[1].ingredientName").value("Burger Bun"))
                 .andExpect(jsonPath("$[0].ingredients[1].foodCategory").value("Baked Products"));
     }
+
+    @Test
+    public void testValidateCsvWorkflow() throws Exception {
+        String csvContent = "meal_name,category,price,description,ingredients\n" +
+                "Cheeseburger,Burger,12.99,\"A juicy beef patty\",\"Beef Patty: 150 g\"\n" +
+                ",Burger,10.00,\"Missing name\",\"Beef Patty: 150 g\"\n" +
+                "Cheeseburger,Burger,12.99,\"Duplicate\",\"Beef Patty: 150 g\"\n" +
+                "NoIngredients,Burger,12.99,\"No ingredients\",\"\"";
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "menu.csv",
+                "text/csv",
+                csvContent.getBytes()
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/inventory/validate")
+                        .file(file)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.validMeals.length()").value(1))
+                .andExpect(jsonPath("$.validMeals[0].mealName").value("Cheeseburger"))
+                .andExpect(jsonPath("$.invalidMeals.length()").value(3))
+                .andExpect(jsonPath("$.invalidMeals[0].reason").value("Missing meal name"))
+                .andExpect(jsonPath("$.invalidMeals[1].reason").value("Duplicate meal name in CSV"))
+                .andExpect(jsonPath("$.invalidMeals[2].reason").value("No ingredients found"));
+    }
+
+    @Test
+    public void testGlobalExceptionHandlerRuntime() throws Exception {
+        // Trigger a RuntimeException by mocking a failure or sending an invalid file (which throws InvalidCsvException -> handled separately or RuntimeException if in getMenuNutritions)
+        // Let's test the RuntimeException thrown by getMenuNutritions when CSV is empty
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "menu.csv",
+                "text/csv",
+                "".getBytes() // empty file throws InvalidCsvException -> getMenuNutritions wraps it in RuntimeException
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/inventory/upload")
+                        .file(file)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Internal Server Error"))
+                .andExpect(jsonPath("$.message").exists());
+    }
 }

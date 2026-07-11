@@ -6,8 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurant.inventory.dto.IngredientEntry;
 import com.restaurant.inventory.dto.IngredientNutrition;
 import com.restaurant.inventory.dto.MealNutrition;
+import com.restaurant.inventory.dto.ImportResponse;
 import com.restaurant.inventory.dto.NormalizedIngredient;
 import com.restaurant.inventory.dto.UsdaFoodDetail;
+import com.restaurant.inventory.dto.InvalidMealEntry;
+import com.restaurant.inventory.dto.ValidationResult;
 import com.restaurant.inventory.event.MenuNutritionEvent;
 import com.restaurant.inventory.helper.CsvParserHelper;
 import com.restaurant.inventory.hooks.OpenRouter;
@@ -20,8 +23,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +39,53 @@ public class MenuCsvService {
     private final UsdaService usdaService;
     private final MenuNutritionPublisher menuNutritionPublisher;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public ValidationResult validateCsv(MultipartFile file) {
+        csvParserHelper.validateFile(file);
+        List<Map<String, String>> rows = csvParserHelper.parse(file);
+        LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap = csvParserHelper.parseMenu(file);
+
+        List<CsvParserHelper.MealCsvEntry> valid = new ArrayList<>();
+        List<InvalidMealEntry> invalid = new ArrayList<>();
+        Set<String> seenNames = new LinkedHashSet<>();
+        
+        boolean isListFormat = !rows.isEmpty() && rows.get(0).containsKey("ingredients");
+        
+        int rowIndex = 1;
+        for (Map<String, String> row : rows) {
+            String mealName = row.get("meal_name");
+            if (mealName == null || mealName.isBlank()) {
+                invalid.add(new InvalidMealEntry(rowIndex, "", "Missing meal name"));
+            } else if (isListFormat && seenNames.contains(mealName.trim().toLowerCase())) {
+                invalid.add(new InvalidMealEntry(rowIndex, mealName.trim(), "Duplicate meal name in CSV"));
+            } else {
+                seenNames.add(mealName.trim().toLowerCase());
+            }
+            rowIndex++;
+        }
+
+        for (Map.Entry<String, CsvParserHelper.MealCsvEntry> entry : menuMap.entrySet()) {
+            CsvParserHelper.MealCsvEntry meal = entry.getValue();
+            if (meal.ingredients().isEmpty()) {
+                int rIdx = 1;
+                for (Map<String, String> r : rows) {
+                    if (meal.mealName().equals(r.get("meal_name"))) break;
+                    rIdx++;
+                }
+                invalid.add(new InvalidMealEntry(rIdx, meal.mealName(), "No ingredients found"));
+            } else {
+                // If it's list format and was a duplicate, it's already in invalid, so don't add to valid.
+                // Actually, if it's a duplicate, we only want the first one to be valid?
+                // The requirements don't specify if the first one is valid or skipped. Let's just say if it's not in the invalid duplicates, it's valid.
+                // Wait, if it's a duplicate in Format A, seenNames has it, but it was flagged.
+                // Let's just add to valid if it has ingredients, and we handle duplicates separately.
+                // Actually, if a meal is duplicated in Format A, CsvParserHelper overwrites it, so menuMap only has ONE entry.
+                // That entry will be valid, but we ALSO flagged the duplicate row. This is fine.
+                valid.add(meal);
+            }
+        }
+        return new ValidationResult(valid, invalid);
+    }
 
     /**
      * All-or-nothing pipeline: if ANY step fails for ANY meal the entire
@@ -62,6 +114,22 @@ public class MenuCsvService {
             throw new RuntimeException("Step 2 Failed: CSV Parsing Error - " + e.getMessage(), e);
         }
 
+        return runPipeline(menuMap, file.getOriginalFilename());
+    }
+
+    public ImportResponse importFromJson(List<CsvParserHelper.MealCsvEntry> meals) {
+        LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap = new LinkedHashMap<>();
+        for (CsvParserHelper.MealCsvEntry meal : meals) {
+            menuMap.put(meal.mealName(), meal);
+        }
+        List<MealNutrition> result = runPipeline(menuMap, "JSON import");
+        return new ImportResponse("Import started — " + result.size() + " meals queued for processing.", result.size());
+    }
+
+    /**
+     * Shared pipeline — called by both endpoints after parsing is done
+     */
+    public List<MealNutrition> runPipeline(LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap, String sourceLabel) {
         List<MealNutrition> result = new ArrayList<>();
 
         try {
@@ -144,7 +212,7 @@ public class MenuCsvService {
             }
 
             // ── Step 5: Publish event (only reached if ALL meals succeeded) ──
-            log.info("Processed {} meals from '{}' — publishing event", result.size(), file.getOriginalFilename());
+            log.info("Processed {} meals from '{}' — publishing event", result.size(), sourceLabel);
             try {
                 menuNutritionPublisher.publish(new MenuNutritionEvent(result));
             } catch (Exception e) {
@@ -154,10 +222,10 @@ public class MenuCsvService {
             return result;
 
         } catch (RuntimeException re) {
-            log.error("Pipeline failed — no event published. Cause: {}", re.getMessage(), re);
+            log.error("Pipeline failed for '{}': {}", sourceLabel, re.getMessage(), re);
             throw re;
         } catch (Exception e) {
-            log.error("Pipeline failed — no event published. Cause: {}", e.getMessage(), e);
+            log.error("Pipeline failed for '{}': {}", sourceLabel, e.getMessage(), e);
             throw new RuntimeException("Menu nutrition pipeline failed with unknown error: " + e.getMessage(), e);
         }
     }
