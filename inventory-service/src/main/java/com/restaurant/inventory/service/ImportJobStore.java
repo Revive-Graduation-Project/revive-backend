@@ -70,4 +70,21 @@ public class ImportJobStore {
         }
         jobs.put(jobId, status);
     }
+
+    /**
+     * Attempts to cancel an ongoing job.
+     * @return true if successfully cancelled, false if the job was already finished or didn't exist.
+     */
+    public boolean cancelJob(String jobId) {
+        ImportJobStatus current = jobs.get(jobId);
+        if (current == null) {
+            return false;
+        }
+        if (current.isTerminal()) {
+            return false;
+        }
+        jobs.put(jobId, new ImportJobStatus(jobId, JobState.CANCELLED, "Import cancelled by user"));
+        log.info("ImportJobStore: job {} cancelled", jobId);
+        return true;
+    }
 }

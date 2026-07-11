@@ -94,4 +94,21 @@ public class InventoryController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @DeleteMapping("/import-status/{jobId}")
+    public ResponseEntity<?> cancelImportJob(
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable String jobId) {
+
+        ResponseEntity<?> forbidden = assertAllowed(role);
+        if (forbidden != null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        boolean cancelled = importJobStore.cancelJob(jobId);
+        if (cancelled) {
+            log.info("Job {} cancelled by {}", jobId, role);
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.badRequest().body("Job could not be cancelled (already finished or invalid).");
+        }
+    }
 }

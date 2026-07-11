@@ -9,10 +9,10 @@ public record ImportJobStatus(
         String errorMessage
 ) {
     public enum JobState {
-        PENDING, PROCESSING, DONE, FAILED
+        PENDING, PROCESSING, DONE, FAILED, CANCELLED
     }
 
     public boolean isTerminal() {
-        return state == JobState.DONE || state == JobState.FAILED;
+        return state == JobState.DONE || state == JobState.FAILED || state == JobState.CANCELLED;
     }
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurant.inventory.dto.IngredientEntry;
 import com.restaurant.inventory.dto.IngredientNutrition;
 import com.restaurant.inventory.dto.MealNutrition;
+import com.restaurant.inventory.dto.ImportJobStatus;
 import com.restaurant.inventory.dto.ImportResponse;
 import com.restaurant.inventory.dto.NormalizedIngredient;
 import com.restaurant.inventory.dto.UsdaFoodDetail;
@@ -109,7 +110,7 @@ public class MenuCsvService {
             throw new RuntimeException("Step 2 Failed: CSV Parsing Error - " + e.getMessage(), e);
         }
 
-        return runPipeline(menuMap, file.getOriginalFilename());
+        return runPipeline(menuMap, file.getOriginalFilename(), null);
     }
 
     public ImportResponse importFromJson(List<CsvParserHelper.MealCsvEntry> meals) {
@@ -123,7 +124,7 @@ public class MenuCsvService {
         CompletableFuture.runAsync(() -> {
             importJobStore.markProcessing(jobId);
             try {
-                runPipeline(menuMap, "JSON import");
+                runPipeline(menuMap, "JSON import", jobId);
                 importJobStore.markDone(jobId);
             } catch (Exception e) {
                 importJobStore.markFailed(jobId, e.getMessage());
@@ -137,10 +138,11 @@ public class MenuCsvService {
     /**
      * Shared pipeline — called by both endpoints after parsing is done
      */
-    public List<MealNutrition> runPipeline(LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap, String sourceLabel) {
+    public List<MealNutrition> runPipeline(LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap, String sourceLabel, String jobId) {
         List<MealNutrition> result = new ArrayList<>();
 
         try {
+            checkCancellation(jobId);
             // ── Step 0: Batch AI Normalization ────────────────
             log.info("Batching AI normalizer for all ingredients...");
             List<String> allUniqueIngredients = menuMap.values().stream()
@@ -163,6 +165,7 @@ public class MenuCsvService {
             }
 
             for (var entry : menuMap.entrySet()) {
+                checkCancellation(jobId);
                 String mealName = entry.getKey();
                 CsvParserHelper.MealCsvEntry mealCsvEntry = entry.getValue();
                 List<IngredientEntry> ingredients = mealCsvEntry.ingredients();
@@ -220,6 +223,7 @@ public class MenuCsvService {
             }
 
             // ── Step 5: Publish event (only reached if ALL meals succeeded) ──
+            checkCancellation(jobId);
             log.info("Processed {} meals from '{}' — publishing event", result.size(), sourceLabel);
             try {
                 menuNutritionPublisher.publish(new MenuNutritionEvent(result));
@@ -239,6 +243,16 @@ public class MenuCsvService {
     }
 
     // ───────────────────────── private helpers ─────────────────────────
+
+    private void checkCancellation(String jobId) {
+        if (jobId != null) {
+            importJobStore.getStatus(jobId).ifPresent(status -> {
+                if (status.state() == ImportJobStatus.JobState.CANCELLED) {
+                    throw new java.util.concurrent.CancellationException("Import cancelled by user");
+                }
+            });
+        }
+    }
 
     /**
      * Step 0 – call AI to normalize all unique ingredient names in the batch.
