@@ -5,24 +5,19 @@ import com.restaurant.order.client.PaymentServiceClient;
 import com.restaurant.order.dto.request.OrderItemRequest;
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
-import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
 import com.restaurant.order.entity.Order;
-import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.enums.OrderStatus;
 import com.restaurant.order.enums.PaymentMethod;
 import com.restaurant.order.events.OrderCancellationEvent;
 import com.restaurant.order.events.OrderCreatedEvent;
 import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
-import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
 import com.restaurant.order.events.points.RewardPointsEarnedEvent;
-import com.restaurant.order.exception.MenuServiceException;
 import com.restaurant.order.exception.OrderNotFoundException;
-import com.restaurant.order.exception.PointsException;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.messaging.MessagePublisher;
 import com.restaurant.order.repository.OrderRepository;
-import com.restaurant.order.service.OrderCalculator;
+import com.restaurant.order.saga.OrderPlacementSaga;
 import com.restaurant.order.service.OrderService;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
@@ -47,9 +42,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final MessagePublisher messagePublisher;
     private final OrderMapper orderMapper;
-    private final OrderCalculator orderCalculator;
     private final MenuClient menuClient;
     private final PaymentServiceClient paymentServiceClient;
+    private final OrderPlacementSaga orderPlacementSaga;
 
     @Autowired
     @Lazy
@@ -57,113 +52,9 @@ public class OrderServiceImpl implements OrderService {
 
     public record CancelResult(OrderStatus previousStatus, Order order) {}
 
-    //  @Transactional is not defined to prevent DB locking during HTTP calls
     @Override
     public OrderResponse placeOrder(PlaceOrderRequest request, Long clientId) {
-        log.info("Placing order for customerId: {}", clientId);
-
-        // 1. Validate points
-        int pointsToRedeem = request.points() != null ? request.points() : 0;
-        int discount = switch (pointsToRedeem) {
-            case 0 -> 0;
-            case 100 -> 10;
-            case 200 -> 20;
-            case 300 -> 30;
-            default -> throw new PointsException("Invalid redemption points. Allowed values are 100, 200, or 300.");
-        };
-
-        Order order = Order.builder()
-                .clientId(clientId)
-                .discount(discount)
-                .paymentMethod(request.paymentMethod())
-                .build();
-
-        // 2. Fetch price snapshots one by one (Outside of DB transaction)
-        java.util.Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap = null;
-        boolean hasCustomMeals = request.items().stream().anyMatch(i -> i.mealId() == null);
-        if (hasCustomMeals) {
-            ingredientMap = menuClient.getAllIngredients().stream()
-                    .collect(Collectors.toMap(com.restaurant.order.dto.IngredientDTO::id, i -> i));
-        }
-
-        for (OrderItemRequest itemReq : request.items()) {
-            try {
-                if (itemReq.mealId() != null) {
-                    MealPriceSnapshot meal = menuClient.getMealById(itemReq.mealId());
-                    order.getItems().add(OrderItem.builder()
-                            .order(order)
-                            .mealId(meal.id())
-                            .snapshotName(meal.name())
-                            .snapshotPrice(meal.price())
-                            .snapshotImageUrl(meal.imageUrl())
-                            .quantity(itemReq.quantity())
-                            .build());
-                } else {
-                    if (itemReq.customizations() == null || itemReq.customizations().isEmpty()) {
-                        throw new MenuServiceException("Customizations cannot be empty for custom meal");
-                    }
-                    MealPriceSnapshot meal = calculateCustomMealPrice(itemReq.customizations(), ingredientMap);
-                    order.getItems().add(OrderItem.builder()
-                            .order(order)
-                            .mealId(null)
-                            .customizations(itemReq.customizations())
-                            .snapshotName(meal.name())
-                            .snapshotPrice(meal.price())
-                            .snapshotImageUrl(meal.imageUrl())
-                            .quantity(itemReq.quantity())
-                            .build());
-                }
-            } catch (Exception e) {
-                log.error("Failed to process item: {}", itemReq, e);
-                throw new MenuServiceException("Failed to process item or Menu Service unavailable");
-            }
-        }
-
-        // 3. Calculate total price
-        orderCalculator.calculateTotals(order);
-
-        // 4. Reserve stock via HTTP
-        log.info("Reserving stock for order...");
-        try {
-            menuClient.reserveStock(request.items());
-        } catch (Exception e) {
-            log.error("Failed to reserve stock for order.", e);
-            throw new MenuServiceException("Cannot reserve stock for order. The stock may be insufficient");
-        }
-
-        try {
-            // 5. Persist to DB using the private transactional method (Protects the DB connection pool)
-            Order savedOrder = self.saveInitialOrder(order);
-            log.info("Order saved with id: {} and status PENDING", savedOrder.getId());
-
-            // 6. Trigger next step in saga via Network/RabbitMQ
-            if (pointsToRedeem != 0) {
-                log.info("Triggering async point redemption for {} points...", pointsToRedeem);
-                publishPointRedemptionRequestedEvent(savedOrder);
-            } else {
-                if (!request.paymentMethod().equals(PaymentMethod.CASH)) {
-                    savedOrder.setStatus(OrderStatus.AWAITING_PAYMENT);
-                    createPaymentIntentSync(savedOrder); // HTTP call
-                    self.updateOrderInDb(savedOrder);         // Save intent IDs
-                } else {
-                    log.info("Payment method is CASH for order {}, skipping payment service", savedOrder.getId());
-                    publishOrderCreatedEvent(savedOrder);
-                }
-            }
-            return orderMapper.toResponse(savedOrder);
-
-        } catch (Exception e) {
-            log.error("Failed to complete order placement for clientId: {}. Rolling back stock.", clientId, e);
-            try {
-                menuClient.rollbackStock(buildItemRequests(order));
-                if (order.getId() != null) {
-                    self.markOrderAsFailed(order.getId());
-                }
-            } catch (Exception rollbackEx) {
-                log.error("CRITICAL: Failed to rollback stock after order placement failure", rollbackEx);
-            }
-            throw e;
-        }
+        return orderPlacementSaga.execute(request, clientId);
     }
 
     @Transactional
@@ -376,21 +267,8 @@ public class OrderServiceImpl implements OrderService {
     // --- Private helpers ---
 
     @Transactional
-    public Order saveInitialOrder(Order order) {
-        return orderRepository.save(order);
-    }
-
-    @Transactional
     public void updateOrderInDb(Order order) {
         orderRepository.save(order);
-    }
-
-    @Transactional
-    public void markOrderAsFailed(Long orderId) {
-        orderRepository.findById(orderId).ifPresent(order -> {
-            order.setStatus(OrderStatus.CANCELED);
-            orderRepository.save(order);
-        });
     }
 
     private void executeCompensatingTransactions(Order order, boolean paymentSucceeded) {
@@ -411,47 +289,9 @@ public class OrderServiceImpl implements OrderService {
 
     private List<OrderItemRequest> buildItemRequests(Order order) {
         return order.getItems().stream()
-                .filter(item -> item.getMealId() != null) // Filter out custom meals for stock reservation
+                .filter(item -> item.getMealId() != null)
                 .map(item -> new OrderItemRequest(item.getMealId(), null, item.getQuantity()))
                 .toList();
-    }
-
-    private MealPriceSnapshot calculateCustomMealPrice(java.util.Map<String, Object> customizations, java.util.Map<Long, com.restaurant.order.dto.IngredientDTO> ingredientMap) {
-        java.math.BigDecimal totalPrice = java.math.BigDecimal.ZERO;
-        String name = "Custom Meal";
-
-        try {
-            // primary
-            java.util.Map<String, Object> primary = (java.util.Map<String, Object>) customizations.get("primary");
-            if (primary != null && primary.get("id") != null) {
-                Long primaryId = Long.valueOf(primary.get("id").toString());
-                com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(primaryId);
-                if (ing != null) {
-                    totalPrice = totalPrice.add(java.math.BigDecimal.valueOf(ing.price()));
-                    name = "Custom " + ing.name() + " Meal";
-                }
-            }
-
-            // additions
-            List<java.util.Map<String, Object>> additions = (List<java.util.Map<String, Object>>) customizations.get("additions");
-            if (additions != null) {
-                for (java.util.Map<String, Object> add : additions) {
-                    if (add.get("id") == null || add.get("grams") == null) continue;
-                    Long addId = Long.valueOf(add.get("id").toString());
-                    Double grams = Double.valueOf(add.get("grams").toString());
-                    com.restaurant.order.dto.IngredientDTO ing = ingredientMap.get(addId);
-                    if (ing != null) {
-                        java.math.BigDecimal additionPrice = java.math.BigDecimal.valueOf(ing.price()).multiply(java.math.BigDecimal.valueOf(grams));
-                        totalPrice = totalPrice.add(additionPrice);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to parse customizations for price calculation", e);
-            throw new MenuServiceException("Invalid customization data");
-        }
-
-        return new MealPriceSnapshot(null, name, totalPrice, null);
     }
 
     private void publishOrderCreatedEvent(Order order) {
@@ -469,12 +309,6 @@ public class OrderServiceImpl implements OrderService {
                 order.getId(), order.getClientId(), order.getTotalPrice(), "egp");
         order.setStripePaymentIntentId(response.paymentIntentId());
         order.setStripeClientSecret(response.clientSecret());
-    }
-
-    private void publishPointRedemptionRequestedEvent(Order order) {
-        messagePublisher.publishPointRedemptionRequested(
-                new PointRedemptionRequestedEvent(order.getId(), order.getClientId(), order.getDiscount() * 10),
-                UUID.randomUUID().toString(), UUID.randomUUID().toString());
     }
 
     private void publishPointRedemptionRollbackEvent(Order order) {
