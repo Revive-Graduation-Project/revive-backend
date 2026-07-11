@@ -22,11 +22,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +40,7 @@ public class MenuCsvService {
     private final OpenRouter agent;
     private final UsdaService usdaService;
     private final MenuNutritionPublisher menuNutritionPublisher;
+    private final ImportJobStore importJobStore;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ValidationResult validateCsv(MultipartFile file) {
@@ -48,18 +51,20 @@ public class MenuCsvService {
         List<CsvParserHelper.MealCsvEntry> valid = new ArrayList<>();
         List<InvalidMealEntry> invalid = new ArrayList<>();
         Set<String> seenNames = new LinkedHashSet<>();
-        
-        boolean isListFormat = !rows.isEmpty() && rows.get(0).containsKey("ingredients");
-        
+
+        // Build a name→firstRowIndex map in a single pass for O(1) lookup later
+        Map<String, Integer> mealRowIndex = new HashMap<>();
         int rowIndex = 1;
         for (Map<String, String> row : rows) {
             String mealName = row.get("meal_name");
             if (mealName == null || mealName.isBlank()) {
                 invalid.add(new InvalidMealEntry(rowIndex, "", "Missing meal name"));
-            } else if (isListFormat && seenNames.contains(mealName.trim().toLowerCase())) {
+            } else if (seenNames.contains(mealName.trim().toLowerCase())) {
+                // Duplicate check applies to BOTH list-format and row-format CSVs
                 invalid.add(new InvalidMealEntry(rowIndex, mealName.trim(), "Duplicate meal name in CSV"));
             } else {
                 seenNames.add(mealName.trim().toLowerCase());
+                mealRowIndex.put(mealName.trim(), rowIndex);
             }
             rowIndex++;
         }
@@ -67,20 +72,10 @@ public class MenuCsvService {
         for (Map.Entry<String, CsvParserHelper.MealCsvEntry> entry : menuMap.entrySet()) {
             CsvParserHelper.MealCsvEntry meal = entry.getValue();
             if (meal.ingredients().isEmpty()) {
-                int rIdx = 1;
-                for (Map<String, String> r : rows) {
-                    if (meal.mealName().equals(r.get("meal_name"))) break;
-                    rIdx++;
-                }
-                invalid.add(new InvalidMealEntry(rIdx, meal.mealName(), "No ingredients found"));
+                // Use the pre-built index map — no second scan needed
+                int knownRowIndex = mealRowIndex.getOrDefault(meal.mealName().trim(), rowIndex);
+                invalid.add(new InvalidMealEntry(knownRowIndex, meal.mealName(), "No ingredients found"));
             } else {
-                // If it's list format and was a duplicate, it's already in invalid, so don't add to valid.
-                // Actually, if it's a duplicate, we only want the first one to be valid?
-                // The requirements don't specify if the first one is valid or skipped. Let's just say if it's not in the invalid duplicates, it's valid.
-                // Wait, if it's a duplicate in Format A, seenNames has it, but it was flagged.
-                // Let's just add to valid if it has ingredients, and we handle duplicates separately.
-                // Actually, if a meal is duplicated in Format A, CsvParserHelper overwrites it, so menuMap only has ONE entry.
-                // That entry will be valid, but we ALSO flagged the duplicate row. This is fine.
                 valid.add(meal);
             }
         }
@@ -122,16 +117,21 @@ public class MenuCsvService {
         for (CsvParserHelper.MealCsvEntry meal : meals) {
             menuMap.put(meal.mealName(), meal);
         }
-        
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+
+        String jobId = importJobStore.createJob();
+
+        CompletableFuture.runAsync(() -> {
+            importJobStore.markProcessing(jobId);
             try {
                 runPipeline(menuMap, "JSON import");
+                importJobStore.markDone(jobId);
             } catch (Exception e) {
-                log.error("Background JSON import failed", e);
+                importJobStore.markFailed(jobId, e.getMessage());
+                log.error("Background JSON import failed for job {}", jobId, e);
             }
         });
-        
-        return new ImportResponse("Import started — " + meals.size() + " meals queued for processing.", meals.size());
+
+        return new ImportResponse(jobId, "Import started — " + meals.size() + " meals queued for processing.", meals.size());
     }
 
     /**
