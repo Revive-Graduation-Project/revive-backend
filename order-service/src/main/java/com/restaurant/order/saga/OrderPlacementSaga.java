@@ -11,7 +11,9 @@ import com.restaurant.order.entity.Order;
 import com.restaurant.order.enums.OrderStatus;
 import com.restaurant.order.enums.PaymentMethod;
 import com.restaurant.order.events.OrderCreatedEvent;
+import com.restaurant.order.events.payments.PaymentRefundRequestedEvent;
 import com.restaurant.order.events.points.PointRedemptionRequestedEvent;
+import com.restaurant.order.events.points.PointRedemptionRollbackRequestedEvent;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.messaging.MessagePublisher;
 import com.restaurant.order.repository.OrderRepository;
@@ -95,6 +97,13 @@ public class OrderPlacementSaga {
                 messagePublisher.publishPointRedemptionRequested(
                         new PointRedemptionRequestedEvent(saved.getId(), clientId, pointsToRedeem),
                         UUID.randomUUID().toString(), UUID.randomUUID().toString());
+                compensations.push(() -> {
+                    try {
+                        messagePublisher.publishPointRedemptionRollback(
+                                new PointRedemptionRollbackRequestedEvent(saved.getId(), clientId, pointsToRedeem),
+                                UUID.randomUUID().toString(), UUID.randomUUID().toString());
+                    } catch (Exception e) { log.error("Compensation: rollback points failed", e); }
+                });
             } else if (!request.paymentMethod().equals(PaymentMethod.CASH)) {
                 saved.setStatus(OrderStatus.AWAITING_PAYMENT);
                 PaymentServiceClient.PaymentIntentResponse intent =
@@ -102,6 +111,14 @@ public class OrderPlacementSaga {
                 saved.setStripePaymentIntentId(intent.paymentIntentId());
                 saved.setStripeClientSecret(intent.clientSecret());
                 self.updateOrder(saved);
+                compensations.push(() -> {
+                    try { 
+                        messagePublisher.publishPaymentRefund(
+                                new PaymentRefundRequestedEvent(saved.getId(), clientId, saved.getTotalPrice()),
+                                UUID.randomUUID().toString(), UUID.randomUUID().toString());
+                    }
+                    catch (Exception e) { log.error("Compensation: publishPaymentRefund failed", e); }
+                });
             } else {
                 log.info("OrderPlacementSaga: CASH payment for order={}, publishing OrderCreated", saved.getId());
                 messagePublisher.publishOrderCreated(
@@ -148,12 +165,16 @@ public class OrderPlacementSaga {
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private Map<Long, MealPriceSnapshot> fetchSnapshots(PlaceOrderRequest request) {
-        return request.items().stream()
+        List<Long> mealIds = request.items().stream()
                 .filter(i -> i.mealId() != null)
+                .map(OrderItemRequest::mealId)
+                .distinct()
+                .toList();
+
+        return mealIds.stream()
                 .collect(Collectors.toMap(
-                        OrderItemRequest::mealId,
-                        i -> menuClient.getMealById(i.mealId()),
-                        (a, b) -> a
+                        id -> id,
+                        id -> menuClient.getMealById(id)
                 ));
     }
 
