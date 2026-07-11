@@ -73,7 +73,7 @@ public class MealServiceImpl implements MealService {
                     try {
                         ingredient = ingredientService.resolveOrSaveIngredient(ingDto);
                     } catch (Exception e) {
-                        throw new RuntimeException("Saga Step B Failed: Could not resolve ingredient '" + ingDto.name() + "' for meal '" + mealNutrition.mealName() + "' - " + e.getMessage(), e);
+                        throw new RuntimeException("Saga Step B Failed: Could not resolve ingredient '" + ingDto.ingredientName() + "' for meal '" + mealNutrition.mealName() + "' - " + e.getMessage(), e);
                     }
 
                     mealIngredients.add(MealIngredient.builder()

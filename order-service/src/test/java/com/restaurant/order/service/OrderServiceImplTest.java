@@ -5,14 +5,13 @@ import com.restaurant.order.client.PaymentServiceClient;
 import com.restaurant.order.dto.request.OrderItemRequest;
 import com.restaurant.order.dto.request.PlaceOrderRequest;
 import com.restaurant.order.dto.response.OrderResponse;
-import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.enums.OrderStatus;
 import com.restaurant.order.enums.PaymentMethod;
-import com.restaurant.order.exception.PointsException;
 import com.restaurant.order.mapper.OrderMapper;
 import com.restaurant.order.messaging.MessagePublisher;
 import com.restaurant.order.repository.OrderRepository;
+import com.restaurant.order.saga.OrderPlacementSaga;
 import com.restaurant.order.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,9 +34,9 @@ class OrderServiceImplTest {
     @Mock private OrderRepository orderRepository;
     @Mock private MessagePublisher messagePublisher;
     @Mock private OrderMapper orderMapper;
-    @Mock private OrderCalculator orderCalculator;
     @Mock private MenuClient menuClient;
     @Mock private PaymentServiceClient paymentServiceClient;
+    @Mock private OrderPlacementSaga orderPlacementSaga;
 
     private OrderServiceImpl orderService;
 
@@ -48,40 +46,29 @@ class OrderServiceImplTest {
                 orderRepository,
                 messagePublisher,
                 orderMapper,
-                orderCalculator,
                 menuClient,
-                paymentServiceClient
+                paymentServiceClient,
+                orderPlacementSaga
         );
     }
 
     // ── Tests ────────────────────────────────────────────────────
 
     @Test
-    void placeOrder_withValidPoints_fetchesPriceAndSavesOrder() {
-        Long mealId = 1L;
-        OrderItemRequest itemReq = new OrderItemRequest(mealId, null, 2);
-        // Using CREDIT_CARD as requested
-        PlaceOrderRequest request = new PlaceOrderRequest(List.of(itemReq), 100, PaymentMethod.CREDIT_CARD);
+    void placeOrder_delegatesToOrderPlacementSaga() {
+        PlaceOrderRequest request = new PlaceOrderRequest(
+                List.of(new OrderItemRequest(1L, null, 1)),
+                0,
+                PaymentMethod.CASH
+        );
+        OrderResponse expected = new OrderResponse(1L, 42L, OrderStatus.PENDING,
+                BigDecimal.TEN, 0, null, null, null, List.of());
+        when(orderPlacementSaga.execute(request, 42L)).thenReturn(expected);
 
-        when(menuClient.getMealById(mealId)).thenReturn(new MealPriceSnapshot(mealId, "Test Meal", BigDecimal.valueOf(9.99), "http://example.com/image.jpg"));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
-            Order o = inv.getArgument(0);
-            o.setId(1L);
-            return o;
-        });
-        when(orderMapper.toResponse(any(Order.class))).thenReturn(new OrderResponse(1L, 100L, OrderStatus.PENDING, BigDecimal.TEN, 0, null, null, null ,List.of() ));
+        OrderResponse result = orderService.placeOrder(request, 42L);
 
-        OrderResponse response = orderService.placeOrder(request, 100L);
-
-        assertNotNull(response);
-        verify(menuClient).reserveStock(any());
-        verify(messagePublisher).publishPointRedemptionRequested(any(), anyString(), anyString());
-    }
-
-    @Test
-    void placeOrder_withInvalidPoints_throwsPointsException() {
-        PlaceOrderRequest request = new PlaceOrderRequest(Collections.emptyList(), 50, PaymentMethod.CREDIT_CARD);
-        assertThrows(PointsException.class, () -> orderService.placeOrder(request, 100L));
+        assertEquals(expected, result);
+        verify(orderPlacementSaga).execute(request, 42L);
     }
 
     @Test
@@ -129,15 +116,6 @@ class OrderServiceImplTest {
 
     @Test
     void transactionalHelpers_arePublicAndTransactional() throws NoSuchMethodException {
-        var saveInitialOrder = OrderServiceImpl.class.getMethod("saveInitialOrder", Order.class);
-        assertNotNull(saveInitialOrder.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
-
-        var updateOrderInDb = OrderServiceImpl.class.getMethod("updateOrderInDb", Order.class);
-        assertNotNull(updateOrderInDb.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
-
-        var markOrderAsFailed = OrderServiceImpl.class.getMethod("markOrderAsFailed", Long.class);
-        assertNotNull(markOrderAsFailed.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
-
         var cancelOrderInDb = OrderServiceImpl.class.getMethod("cancelOrderInDb", Long.class);
         assertNotNull(cancelOrderInDb.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
 
