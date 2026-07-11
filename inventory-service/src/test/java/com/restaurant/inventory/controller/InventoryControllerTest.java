@@ -83,7 +83,8 @@ public class InventoryControllerTest {
                 "Cheeseburger,Burger,12.99,\"A juicy beef patty\",\"Beef Patty: 150 g\"\n" +
                 ",Burger,10.00,\"Missing name\",\"Beef Patty: 150 g\"\n" +
                 "Cheeseburger,Burger,12.99,\"Duplicate\",\"Beef Patty: 150 g\"\n" +
-                "NoIngredients,Burger,12.99,\"No ingredients\",\"\"";
+                "NoIngredients,Burger,12.99,\"No ingredients\",\"\"\n" +
+                "NoPrice,Burger,0,\"No price\",\"Beef Patty: 150 g\"";
 
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -98,10 +99,11 @@ public class InventoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.validMeals.length()").value(1))
                 .andExpect(jsonPath("$.validMeals[0].mealName").value("Cheeseburger"))
-                .andExpect(jsonPath("$.invalidMeals.length()").value(3))
+                .andExpect(jsonPath("$.invalidMeals.length()").value(4))
                 .andExpect(jsonPath("$.invalidMeals[0].reason").value("Missing meal name"))
                 .andExpect(jsonPath("$.invalidMeals[1].reason").value("Duplicate meal name in CSV"))
-                .andExpect(jsonPath("$.invalidMeals[2].reason").value("No ingredients found"));
+                .andExpect(jsonPath("$.invalidMeals[2].reason").value("No ingredients found"))
+                .andExpect(jsonPath("$.invalidMeals[3].reason").value("Missing or invalid price"));
     }
 
     @Test

@@ -72,10 +72,12 @@ public class MenuCsvService {
 
         for (Map.Entry<String, CsvParserHelper.MealCsvEntry> entry : menuMap.entrySet()) {
             CsvParserHelper.MealCsvEntry meal = entry.getValue();
+            int knownRowIndex = mealRowIndex.getOrDefault(meal.mealName().trim(), rowIndex);
+            
             if (meal.ingredients().isEmpty()) {
-                // Use the pre-built index map — no second scan needed
-                int knownRowIndex = mealRowIndex.getOrDefault(meal.mealName().trim(), rowIndex);
                 invalid.add(new InvalidMealEntry(knownRowIndex, meal.mealName(), "No ingredients found"));
+            } else if (meal.price() <= 0) {
+                invalid.add(new InvalidMealEntry(knownRowIndex, meal.mealName(), "Missing or invalid price"));
             } else {
                 valid.add(meal);
             }
