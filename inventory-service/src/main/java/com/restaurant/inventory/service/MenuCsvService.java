@@ -122,8 +122,16 @@ public class MenuCsvService {
         for (CsvParserHelper.MealCsvEntry meal : meals) {
             menuMap.put(meal.mealName(), meal);
         }
-        List<MealNutrition> result = runPipeline(menuMap, "JSON import");
-        return new ImportResponse("Import started — " + result.size() + " meals queued for processing.", result.size());
+        
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                runPipeline(menuMap, "JSON import");
+            } catch (Exception e) {
+                log.error("Background JSON import failed", e);
+            }
+        });
+        
+        return new ImportResponse("Import started — " + meals.size() + " meals queued for processing.", meals.size());
     }
 
     /**
