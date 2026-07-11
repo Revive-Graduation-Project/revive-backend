@@ -44,7 +44,7 @@ public class OpenRouter {
                     "CRITICAL: The output array MUST have the exact same number of elements as the input batch, in the exact same order.";
 
             ObjectNode requestBody = objectMapper.createObjectNode();
-            requestBody.put("model", "nvidia/nemotron-nano-9b-v2:free");
+            requestBody.put("model", "google/gemini-2.0-flash-lite-preview-02-05:free");
 
             ArrayNode messages = requestBody.putArray("messages");
 
