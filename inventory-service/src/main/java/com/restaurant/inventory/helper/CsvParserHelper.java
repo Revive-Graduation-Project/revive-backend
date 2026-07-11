@@ -105,7 +105,7 @@ public class CsvParserHelper {
             if (isListFormat) {
                 String ingredientsRaw = row.get("ingredients");
                 List<IngredientEntry> ingredients = parseIngredientsList(ingredientsRaw);
-                menuMap.put(mealName.trim(), new MealCsvEntry(ingredients, category.trim(), price, description.trim()));
+                menuMap.put(mealName.trim(), new MealCsvEntry(mealName.trim(), ingredients, category.trim(), price, description.trim()));
             } else {
                 String ingredient = row.get("ingredient");
                 String quantityRaw = row.get("quantity");
@@ -130,7 +130,7 @@ public class CsvParserHelper {
 
                 double finalPrice = price;
                 MealCsvEntry mealEntry = menuMap.computeIfAbsent(mealName, k ->
-                        new MealCsvEntry(new ArrayList<>(), category.trim(), finalPrice, description.trim()));
+                        new MealCsvEntry(mealName.trim(), new ArrayList<>(), category.trim(), finalPrice, description.trim()));
                 mealEntry.ingredients().add(entry);
             }
         }
@@ -183,7 +183,7 @@ public class CsvParserHelper {
     /**
      * Holds the parsed CSV data for a single meal.
      */
-    public record MealCsvEntry(List<IngredientEntry> ingredients, String category, double price, String description) {
+    public record MealCsvEntry(String mealName, List<IngredientEntry> ingredients, String category, double price, String description) {
     }
 
     public void validateFile(MultipartFile file) {
