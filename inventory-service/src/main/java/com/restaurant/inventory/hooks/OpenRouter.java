@@ -45,7 +45,7 @@ public class OpenRouter {
                     "CRITICAL: The output array MUST have the exact same number of elements as the input batch, in the exact same order.";
 
             ObjectNode requestBody = objectMapper.createObjectNode();
-            requestBody.put("model", "openai/gpt-oss-20b:free");
+            requestBody.put("model", "google/gemma-4-26b-a4b-it:free");
 
             ArrayNode messages = requestBody.putArray("messages");
 
