@@ -2,14 +2,11 @@ package com.restaurant.inventory;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import io.github.cdimascio.dotenv.Dotenv;
 
-@SpringBootApplication(exclude = {
-		DataSourceAutoConfiguration.class,
-		HibernateJpaAutoConfiguration.class
-})
+@SpringBootApplication
+@EnableAsync
 public class Application {
 	public static void main(String[] args) {
 		// Load .env file. System.setProperty() sets Java properties (used by Spring),

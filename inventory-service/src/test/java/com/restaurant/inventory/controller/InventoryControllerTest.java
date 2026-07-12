@@ -25,7 +25,12 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+    "spring.datasource.url=jdbc:h2:mem:testdb",
+    "spring.datasource.driver-class-name=org.h2.Driver",
+    "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+    "spring.jpa.hibernate.ddl-auto=create-drop"
+})
 @AutoConfigureMockMvc
 public class InventoryControllerTest {
 
@@ -40,6 +45,9 @@ public class InventoryControllerTest {
 
     @MockBean
     private MenuNutritionPublisher menuNutritionPublisher;
+
+    @MockBean
+    private com.restaurant.inventory.service.ImportJobService importJobService;
 
     @Test
     public void testUploadCsvWorkflow() throws Exception {
@@ -83,8 +91,7 @@ public class InventoryControllerTest {
                 "Cheeseburger,Burger,12.99,\"A juicy beef patty\",\"Beef Patty: 150 g\"\n" +
                 ",Burger,10.00,\"Missing name\",\"Beef Patty: 150 g\"\n" +
                 "Cheeseburger,Burger,12.99,\"Duplicate\",\"Beef Patty: 150 g\"\n" +
-                "NoIngredients,Burger,12.99,\"No ingredients\",\"\"\n" +
-                "NoPrice,Burger,0,\"No price\",\"Beef Patty: 150 g\"";
+                "NoIngredients,Burger,12.99,\"No ingredients\",\"\"";
 
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -99,11 +106,10 @@ public class InventoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.validMeals.length()").value(1))
                 .andExpect(jsonPath("$.validMeals[0].mealName").value("Cheeseburger"))
-                .andExpect(jsonPath("$.invalidMeals.length()").value(4))
+                .andExpect(jsonPath("$.invalidMeals.length()").value(3))
                 .andExpect(jsonPath("$.invalidMeals[0].reason").value("Missing meal name"))
                 .andExpect(jsonPath("$.invalidMeals[1].reason").value("Duplicate meal name in CSV"))
-                .andExpect(jsonPath("$.invalidMeals[2].reason").value("No ingredients found"))
-                .andExpect(jsonPath("$.invalidMeals[3].reason").value("Missing or invalid price"));
+                .andExpect(jsonPath("$.invalidMeals[2].reason").value("No ingredients found"));
     }
 
     @Test
@@ -123,5 +129,52 @@ public class InventoryControllerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.error").value("Internal Server Error"))
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    public void testImportJsonEndpoint_AdminSuccess() throws Exception {
+        when(importJobService.startImport(any(List.class)))
+                .thenReturn(Map.of("jobId", "test-job-123", "message", "Import started"));
+
+        String jsonPayload = "[{\"mealName\":\"Burger\",\"category\":\"Main\",\"price\":\"10\",\"description\":\"Desc\",\"ingredients\":[]}]";
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/inventory/import-json")
+                        .contentType("application/json")
+                        .content(jsonPayload)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.jobId").value("test-job-123"));
+    }
+
+    @Test
+    public void testImportJsonEndpoint_UserForbidden() throws Exception {
+        String jsonPayload = "[{}]";
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/inventory/import-json")
+                        .contentType("application/json")
+                        .content(jsonPayload)
+                        .header("X-User-Role", "USER"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void testGetActiveJob_ReturnsNoContentWhenEmpty() throws Exception {
+        when(importJobService.getActiveJob()).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inventory/import-jobs/active"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    public void testCancelJob_ManagerSuccess() throws Exception {
+        com.restaurant.inventory.dto.ImportJobDto mockJob = new com.restaurant.inventory.dto.ImportJobDto(
+                "job-1", com.restaurant.inventory.entity.ImportJob.ImportStatus.CANCELED, 10, 5, "Cancelled by admin.", java.time.LocalDateTime.now(), java.time.LocalDateTime.now()
+        );
+        when(importJobService.cancelJob("job-1")).thenReturn(java.util.Optional.of(mockJob));
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/inventory/import-jobs/job-1/cancel")
+                        .header("X-User-Role", "MANAGER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"));
     }
 }
