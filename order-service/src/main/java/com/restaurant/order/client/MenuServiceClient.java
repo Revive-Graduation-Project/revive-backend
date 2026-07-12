@@ -29,7 +29,7 @@ public class MenuServiceClient implements MenuClient {
         log.info("Fetching meal price from menu-service for mealId: {}", id);
 
         return restClient.get()
-                .uri("/api/menu/{id}/", id)
+                .uri("/api/menu/{id}", id)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, (request, response) -> {
                     throw new MenuServiceException("Meal not found with ID: " + id);
