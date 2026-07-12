@@ -55,6 +55,7 @@ public class IngredientServiceImpl implements IngredientService {
                             .description(ingDto.description())
                             .category(ingDto.foodCategory())
                             .nutrients(ingNutrients)
+                            .stock(2000.0)
                             .build();
                     return ingredientRepository.save(newIng);
                 });
