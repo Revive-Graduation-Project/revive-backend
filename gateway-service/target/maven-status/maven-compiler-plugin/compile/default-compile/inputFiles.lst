@@ -1,6 +1,3 @@
-D:\revive backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\config\JwtAuthenticationManager.java
-D:\revive backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\config\JwtSecurityContextRepository.java
-D:\revive backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\config\JwtUtil.java
-D:\revive backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\config\SecurityConfig.java
-D:\revive backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\filter\AuthHeaderFilter.java
-D:\revive backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\GatewayApplication.java
+D:\revive-repo\revive-backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\config\JwtUtil.java
+D:\revive-repo\revive-backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\filter\AuthHeaderFilter.java
+D:\revive-repo\revive-backend\restaurant-microservices\gateway-service\src\main\java\com\restaurant\gateway\GatewayApplication.java
