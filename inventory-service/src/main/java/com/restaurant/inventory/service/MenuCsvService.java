@@ -6,30 +6,30 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurant.inventory.dto.IngredientEntry;
 import com.restaurant.inventory.dto.IngredientNutrition;
 import com.restaurant.inventory.dto.MealNutrition;
-import com.restaurant.inventory.dto.ImportJobStatus;
-import com.restaurant.inventory.dto.ImportResponse;
 import com.restaurant.inventory.dto.NormalizedIngredient;
 import com.restaurant.inventory.dto.UsdaFoodDetail;
 import com.restaurant.inventory.dto.InvalidMealEntry;
 import com.restaurant.inventory.dto.ValidationResult;
+import com.restaurant.inventory.entity.ImportJob;
 import com.restaurant.inventory.event.MenuNutritionEvent;
 import com.restaurant.inventory.helper.CsvParserHelper;
 import com.restaurant.inventory.hooks.OpenRouter;
 import com.restaurant.inventory.hooks.UsdaService;
 import com.restaurant.inventory.messaging.MenuNutritionPublisher;
+import com.restaurant.inventory.repository.ImportJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,7 +41,7 @@ public class MenuCsvService {
     private final OpenRouter agent;
     private final UsdaService usdaService;
     private final MenuNutritionPublisher menuNutritionPublisher;
-    private final ImportJobStore importJobStore;
+    private final ImportJobRepository importJobRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ValidationResult validateCsv(MultipartFile file) {
@@ -52,33 +52,46 @@ public class MenuCsvService {
         List<CsvParserHelper.MealCsvEntry> valid = new ArrayList<>();
         List<InvalidMealEntry> invalid = new ArrayList<>();
         Set<String> seenNames = new LinkedHashSet<>();
-
-        // Build a name→firstRowIndex map in a single pass for O(1) lookup later
-        Map<String, Integer> mealRowIndex = new HashMap<>();
+        
+        boolean isListFormat = !rows.isEmpty() && rows.get(0).containsKey("ingredients");
+        
         int rowIndex = 1;
         for (Map<String, String> row : rows) {
             String mealName = row.get("meal_name");
             if (mealName == null || mealName.isBlank()) {
                 invalid.add(new InvalidMealEntry(rowIndex, "", "Missing meal name"));
-            } else if (seenNames.contains(mealName.trim().toLowerCase())) {
-                // Duplicate check applies to BOTH list-format and row-format CSVs
+            } else if (isListFormat && seenNames.contains(mealName.trim().toLowerCase())) {
                 invalid.add(new InvalidMealEntry(rowIndex, mealName.trim(), "Duplicate meal name in CSV"));
             } else {
                 seenNames.add(mealName.trim().toLowerCase());
-                mealRowIndex.put(mealName.trim(), rowIndex);
             }
             rowIndex++;
         }
 
         for (Map.Entry<String, CsvParserHelper.MealCsvEntry> entry : menuMap.entrySet()) {
             CsvParserHelper.MealCsvEntry meal = entry.getValue();
-            int knownRowIndex = mealRowIndex.getOrDefault(meal.mealName().trim(), rowIndex);
-            
             if (meal.ingredients().isEmpty()) {
-                invalid.add(new InvalidMealEntry(knownRowIndex, meal.mealName(), "No ingredients found"));
+                int rIdx = 1;
+                for (Map<String, String> r : rows) {
+                    if (meal.mealName().equals(r.get("meal_name"))) break;
+                    rIdx++;
+                }
+                invalid.add(new InvalidMealEntry(rIdx, meal.mealName(), "No ingredients found"));
             } else if (meal.price() <= 0) {
-                invalid.add(new InvalidMealEntry(knownRowIndex, meal.mealName(), "Missing or invalid price"));
+                int rIdx = 1;
+                for (Map<String, String> r : rows) {
+                    if (meal.mealName().equals(r.get("meal_name"))) break;
+                    rIdx++;
+                }
+                invalid.add(new InvalidMealEntry(rIdx, meal.mealName(), "Meal price must be greater than zero"));
             } else {
+                // If it's list format and was a duplicate, it's already in invalid, so don't add to valid.
+                // Actually, if it's a duplicate, we only want the first one to be valid?
+                // The requirements don't specify if the first one is valid or skipped. Let's just say if it's not in the invalid duplicates, it's valid.
+                // Wait, if it's a duplicate in Format A, seenNames has it, but it was flagged.
+                // Let's just add to valid if it has ingredients, and we handle duplicates separately.
+                // Actually, if a meal is duplicated in Format A, CsvParserHelper overwrites it, so menuMap only has ONE entry.
+                // That entry will be valid, but we ALSO flagged the duplicate row. This is fine.
                 valid.add(meal);
             }
         }
@@ -115,26 +128,57 @@ public class MenuCsvService {
         return runPipeline(menuMap, file.getOriginalFilename(), null);
     }
 
-    public ImportResponse importFromJson(List<CsvParserHelper.MealCsvEntry> meals) {
+    @Async
+    @org.springframework.transaction.annotation.Transactional
+    public void importFromJsonAsync(List<CsvParserHelper.MealCsvEntry> meals, String jobId) {
+        int started = importJobRepository.startProcessingIf(
+                jobId,
+                ImportJob.ImportStatus.PROCESSING,
+                "Processing...",
+                meals.size(),
+                List.of(ImportJob.ImportStatus.PENDING)
+        );
+        if (started == 0) {
+            log.info("[Job {}] Cancelled before starting.", jobId);
+            return;
+        }
+
         LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap = new LinkedHashMap<>();
         for (CsvParserHelper.MealCsvEntry meal : meals) {
             menuMap.put(meal.mealName(), meal);
         }
 
-        String jobId = importJobStore.createJob();
+        boolean published = false;
+        try {
+            List<MealNutrition> result = runPipeline(menuMap, "JSON import", jobId);
+            published = true;
 
-        CompletableFuture.runAsync(() -> {
-            importJobStore.markProcessing(jobId);
-            try {
-                runPipeline(menuMap, "JSON import", jobId);
-                importJobStore.markDone(jobId);
-            } catch (Exception e) {
-                importJobStore.markFailed(jobId, e.getMessage());
-                log.error("Background JSON import failed for job {}", jobId, e);
+            // ── Mark as COMPLETED ────────────────────────────────────────────────────
+            importJobRepository.updateStatusAndProgressIf(
+                    jobId,
+                    ImportJob.ImportStatus.COMPLETED,
+                    "Successfully imported " + result.size() + " meals.",
+                    result.size(),
+                    List.of(ImportJob.ImportStatus.PROCESSING)
+            );
+            log.info("[Job {}] Completed — {} meals imported.", jobId, result.size());
+
+        } catch (java.util.concurrent.CancellationException ce) {
+            log.info("[Job {}] Cancelled during processing.", jobId);
+            // Status is already set to CANCELED by the admin, so we just return.
+        } catch (Exception e) {
+            log.error("[Job {}] Failed: {}", jobId, e.getMessage(), e);
+            if (!published) {
+                importJobRepository.updateStatusIf(
+                        jobId,
+                        ImportJob.ImportStatus.FAILED,
+                        "Import failed: " + e.getMessage(),
+                        List.of(ImportJob.ImportStatus.PROCESSING)
+                );
+            } else {
+                log.warn("Job {} failed to save COMPLETED status, but event was successfully published.", jobId);
             }
-        });
-
-        return new ImportResponse(jobId, "Import started — " + meals.size() + " meals queued for processing.", meals.size());
+        }
     }
 
     /**
@@ -144,7 +188,6 @@ public class MenuCsvService {
         List<MealNutrition> result = new ArrayList<>();
 
         try {
-            checkCancellation(jobId);
             // ── Step 0: Batch AI Normalization ────────────────
             log.info("Batching AI normalizer for all ingredients...");
             List<String> allUniqueIngredients = menuMap.values().stream()
@@ -166,8 +209,17 @@ public class MenuCsvService {
                 log.info("Successfully normalized {} unique ingredients via AI", normalizedCache.size());
             }
 
+            int processed = 0;
+            int total = menuMap.size();
             for (var entry : menuMap.entrySet()) {
-                checkCancellation(jobId);
+                // ── Check for cancellation before each meal ──────────────────────────
+                if (jobId != null) {
+                    ImportJob current = importJobRepository.findById(jobId).orElseThrow();
+                    if (current.getStatus() == ImportJob.ImportStatus.CANCELED) {
+                        log.info("Job {} cancelled mid-processing. Aborting.", jobId);
+                        throw new java.util.concurrent.CancellationException("Import cancelled by admin.");
+                    }
+                }
                 String mealName = entry.getKey();
                 CsvParserHelper.MealCsvEntry mealCsvEntry = entry.getValue();
                 List<IngredientEntry> ingredients = mealCsvEntry.ingredients();
@@ -220,15 +272,29 @@ public class MenuCsvService {
                         mealCsvEntry.description(),
                         ingredientNutritions);
                 result.add(mealNutrition);
-
                 log.info("Processed ingredients and nutrients for meal '{}'", mealName);
+
+                // ── Heartbeat: update progress after each meal ────────────────────────
+                if (jobId != null) {
+                    processed++;
+                    int updated = importJobRepository.updateStatusAndProgressIf(
+                            jobId,
+                            ImportJob.ImportStatus.PROCESSING,
+                            "Processing " + processed + " / " + total,
+                            processed,
+                            List.of(ImportJob.ImportStatus.PROCESSING)
+                    );
+                    if (updated == 0) {
+                        log.info("Job {} cancelled mid-processing. Aborting.", jobId);
+                        throw new java.util.concurrent.CancellationException("Import cancelled by admin.");
+                    }
+                }
             }
 
             // ── Step 5: Publish event (only reached if ALL meals succeeded) ──
-            checkCancellation(jobId);
             log.info("Processed {} meals from '{}' — publishing event", result.size(), sourceLabel);
             try {
-                menuNutritionPublisher.publish(new MenuNutritionEvent(result));
+                menuNutritionPublisher.publish(new MenuNutritionEvent(result, jobId));
             } catch (Exception e) {
                 throw new RuntimeException("Step 6 Failed: RabbitMQ Publish Error - " + e.getMessage(), e);
             }
@@ -245,16 +311,6 @@ public class MenuCsvService {
     }
 
     // ───────────────────────── private helpers ─────────────────────────
-
-    private void checkCancellation(String jobId) {
-        if (jobId != null) {
-            importJobStore.getStatus(jobId).ifPresent(status -> {
-                if (status.state() == ImportJobStatus.JobState.CANCELLED) {
-                    throw new java.util.concurrent.CancellationException("Import cancelled by user");
-                }
-            });
-        }
-    }
 
     /**
      * Step 0 – call AI to normalize all unique ingredient names in the batch.
@@ -289,14 +345,34 @@ public class MenuCsvService {
             cleanJson = cleanJson.trim();
 
             try {
+                int startIndex = cleanJson.indexOf('[');
+                int endIndex = cleanJson.lastIndexOf(']');
+                if (startIndex >= 0 && endIndex > startIndex) {
+                    cleanJson = cleanJson.substring(startIndex, endIndex + 1);
+                }
                 List<NormalizedIngredient> parsed = objectMapper.readValue(cleanJson, new TypeReference<>() {
                 });
                 for (NormalizedIngredient item : parsed) {
                     resultMap.put(item.originalName(), item);
                 }
             } catch (JsonProcessingException e) {
-                log.error("Failed to parse AI JSON for chunk. Raw response: {}", aiResponse, e);
-                throw new RuntimeException("Failed to parse AI JSON for batch chunk. Raw response: " + aiResponse, e);
+                log.warn("Standard JSON parsing failed, attempting regex recovery for AI response...");
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{[^{}]*\\}").matcher(aiResponse);
+                boolean recovered = false;
+                while (m.find()) {
+                    try {
+                        NormalizedIngredient item = objectMapper.readValue(m.group(), NormalizedIngredient.class);
+                        if (item.originalName() != null && item.query() != null) {
+                            resultMap.put(item.originalName(), item);
+                            recovered = true;
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (!recovered) {
+                    log.error("Failed to parse AI JSON for chunk. Raw response (DEBUG length: {})", aiResponse.length(), e);
+                    throw new RuntimeException("Failed to parse AI JSON for batch chunk. Output length: " + aiResponse.length(), e);
+                }
             }
         }
         return resultMap;
