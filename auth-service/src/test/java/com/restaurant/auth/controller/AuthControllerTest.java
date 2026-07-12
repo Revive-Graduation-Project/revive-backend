@@ -223,7 +223,7 @@ class AuthControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isUnauthorized())
-                                .andExpect(jsonPath("$.message").value("Invalid username or password"));
+                                .andExpect(jsonPath("$.message").value("Invalid email or password"));
         }
 
         // ── POST /auth/password/reset-request ──────────────────────────────────────
