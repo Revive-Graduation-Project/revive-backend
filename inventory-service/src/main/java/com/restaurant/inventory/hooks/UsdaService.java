@@ -35,8 +35,13 @@ public class UsdaService {
                         "Cholesterol");
 
         public UsdaService(@Value("${usda.api.url}") String baseUrl) {
+                org.springframework.web.reactive.function.client.ExchangeStrategies strategies = org.springframework.web.reactive.function.client.ExchangeStrategies.builder()
+                        .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
+                        .build();
+
                 this.webClient = WebClient.builder()
                                 .baseUrl(baseUrl)
+                                .exchangeStrategies(strategies)
                                 .build();
         }
 
