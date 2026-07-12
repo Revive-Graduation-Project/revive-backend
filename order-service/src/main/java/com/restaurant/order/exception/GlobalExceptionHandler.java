@@ -110,6 +110,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("Invalid value provided", Instant.now()));
     }
 
+    // 400 — invalid type in URL parameter
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("Invalid parameter type provided in the URL", Instant.now()));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
 
