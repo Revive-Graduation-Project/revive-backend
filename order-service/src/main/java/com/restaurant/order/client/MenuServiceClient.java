@@ -57,6 +57,7 @@ public class MenuServiceClient implements MenuClient {
         log.info("Reserving stock in menu-service for {} items...", items.size());
         restClient.post()
                 .uri("/api/ingredients/reserve")
+                .header("X-User-Role", "ADMIN")
                 .body(items)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
@@ -70,6 +71,7 @@ public class MenuServiceClient implements MenuClient {
         log.info("Rolling back stock in menu-service for {} items...", items.size());
         restClient.post()
                 .uri("/api/ingredients/revert")
+                .header("X-User-Role", "ADMIN")
                 .body(items)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
