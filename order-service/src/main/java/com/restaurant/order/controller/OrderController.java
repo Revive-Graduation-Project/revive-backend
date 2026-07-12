@@ -25,8 +25,10 @@ public class OrderController {
             @Valid @RequestBody PlaceOrderRequest request,
             @AuthenticationPrincipal Jwt jwt) {
 
-        Number id = jwt.getClaim("id");
-        Long clientId = id.longValue();
+        Long clientId = -1L;
+        if (jwt != null && jwt.hasClaim("id")) {
+            clientId = jwt.getClaim("id").longValue();
+        }
 
         OrderResponse response = orderService.placeOrder(request, clientId);
 
@@ -44,8 +46,10 @@ public class OrderController {
             @PathVariable Long orderId,
             @AuthenticationPrincipal Jwt jwt) {
 
-        Number id = jwt.getClaim("id");
-        Long clientId = id.longValue();
+        Long clientId = -1L;
+        if (jwt != null && jwt.hasClaim("id")) {
+            clientId = jwt.getClaim("id").longValue();
+        }
 
         // Check if order belongs to the authenticated client
         OrderResponse order = orderService.retrieveOrder(orderId);
@@ -61,8 +65,10 @@ public class OrderController {
     public ResponseEntity<List<OrderResponse>> getClientOrderHistory(
             @AuthenticationPrincipal Jwt jwt) {
 
-        Number id = jwt.getClaim("id");
-        Long clientId = id.longValue();
+        if (jwt == null || !jwt.hasClaim("id")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token is required for order history");
+        }
+        Long clientId = jwt.getClaim("id").longValue();
 
         List<OrderResponse> orderHistory = orderService.getClientOrderHistory(clientId);
         return ResponseEntity.ok(orderHistory);
