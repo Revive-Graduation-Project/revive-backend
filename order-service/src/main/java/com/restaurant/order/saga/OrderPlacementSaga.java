@@ -195,14 +195,40 @@ public class OrderPlacementSaga {
         return order.getItems().stream()
                 .map(item -> {
                     Map<Long, Double> customizations = null;
-                    if (item.getCustomizations() != null) {
-                        customizations = item.getCustomizations().entrySet().stream()
-                                .collect(Collectors.toMap(
-                                        e -> Long.parseLong(e.getKey()),
-                                        e -> Double.parseDouble(e.getValue().toString())));
+                    if (item.getCustomizations() != null && !item.getCustomizations().isEmpty()) {
+                        customizations = new java.util.HashMap<>();
+                        try {
+                            Map<String, Object> customMap = item.getCustomizations();
+                            
+                            // Extract primary
+                            if (customMap.containsKey("primary")) {
+                                Map<String, Object> primary = (Map<String, Object>) customMap.get("primary");
+                                if (primary != null && primary.get("id") != null) {
+                                    Long id = Long.valueOf(primary.get("id").toString());
+                                    Double grams = primary.containsKey("grams") ? Double.valueOf(primary.get("grams").toString()) : 100.0;
+                                    customizations.put(id, grams);
+                                }
+                            }
+                            
+                            // Extract additions
+                            if (customMap.containsKey("additions")) {
+                                List<Map<String, Object>> additions = (List<Map<String, Object>>) customMap.get("additions");
+                                if (additions != null) {
+                                    for (Map<String, Object> add : additions) {
+                                        if (add.get("id") != null && add.get("grams") != null) {
+                                            Long id = Long.valueOf(add.get("id").toString());
+                                            Double grams = Double.valueOf(add.get("grams").toString());
+                                            customizations.merge(id, grams, Double::sum);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("Failed to parse customizations for stock reservation", e);
+                        }
                     }
-                    return new com.restaurant.order.dto.request.ReserveMealRequest(item.getMealId(), item.getQuantity(),
-                            customizations);
+                    return new com.restaurant.order.dto.request.ReserveMealRequest(
+                            item.getMealId(), item.getQuantity(), customizations);
                 })
                 .toList();
     }
