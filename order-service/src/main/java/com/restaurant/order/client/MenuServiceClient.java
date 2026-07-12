@@ -1,6 +1,7 @@
 package com.restaurant.order.client;
 
 import com.restaurant.order.dto.request.OrderItemRequest;
+import com.restaurant.order.dto.request.ReserveMealRequest;
 import com.restaurant.order.dto.snapshot.MealPriceSnapshot;
 import com.restaurant.order.exception.MenuServiceException;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,7 @@ public class MenuServiceClient implements MenuClient {
     private final RestClient restClient;
 
     public MenuServiceClient(RestClient.Builder restClientBuilder,
-                             @Value("${app.services.menu-url}") String menuBaseUrl) {
+            @Value("${app.services.menu-url}") String menuBaseUrl) {
         this.restClient = restClientBuilder
                 .baseUrl(menuBaseUrl)
                 .build();
@@ -49,11 +50,12 @@ public class MenuServiceClient implements MenuClient {
                 .onStatus(HttpStatusCode::isError, (request, response) -> {
                     throw new MenuServiceException("Failed to fetch ingredients from menu service");
                 })
-                .body(new org.springframework.core.ParameterizedTypeReference<List<com.restaurant.order.dto.IngredientDTO>>() {});
+                .body(new org.springframework.core.ParameterizedTypeReference<List<com.restaurant.order.dto.IngredientDTO>>() {
+                });
     }
 
     @Override
-    public void reserveStock(List<OrderItemRequest> items) {
+    public void reserveStock(List<ReserveMealRequest> items) {
         log.info("Reserving stock in menu-service for {} items...", items.size());
         restClient.post()
                 .uri("/api/ingredients/reserve")
@@ -67,7 +69,7 @@ public class MenuServiceClient implements MenuClient {
     }
 
     @Override
-    public void rollbackStock(List<OrderItemRequest> items) {
+    public void rollbackStock(List<ReserveMealRequest> items) {
         log.info("Rolling back stock in menu-service for {} items...", items.size());
         restClient.post()
                 .uri("/api/ingredients/revert")

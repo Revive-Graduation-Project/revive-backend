@@ -31,6 +31,7 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -287,10 +288,19 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private List<OrderItemRequest> buildItemRequests(Order order) {
+    private List<com.restaurant.order.dto.request.ReserveMealRequest> buildItemRequests(Order order) {
         return order.getItems().stream()
-                .filter(item -> item.getMealId() != null)
-                .map(item -> new OrderItemRequest(item.getMealId(), null, item.getQuantity()))
+                .map(item -> {
+                    Map<Long, Double> customizations = null;
+                    if (item.getCustomizations() != null) {
+                        customizations = item.getCustomizations().entrySet().stream()
+                                .collect(Collectors.toMap(
+                                        e -> Long.parseLong(e.getKey()),
+                                        e -> Double.parseDouble(e.getValue().toString())
+                                ));
+                    }
+                    return new com.restaurant.order.dto.request.ReserveMealRequest(item.getMealId(), item.getQuantity(), customizations);
+                })
                 .toList();
     }
 

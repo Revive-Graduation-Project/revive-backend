@@ -191,23 +191,42 @@ public class IngredientServiceImpl implements IngredientService {
      * @return map of ingredientId -> total units to deduct
      */
     private Map<Long, Double> buildIngredientDeductions(List<ReserveMealDTO> meals) {
-        List<Long> mealIds = meals.stream().map(ReserveMealDTO::mealId).toList();
+        Map<Long, Double> deductions = new HashMap<>();
+
+        // Group regular meals by mealId
+        List<Long> regularMealIds = meals.stream()
+                .filter(m -> m.mealId() != null)
+                .map(ReserveMealDTO::mealId)
+                .toList();
+
         Map<Long, Integer> quantityByMealId = meals.stream()
+                .filter(m -> m.mealId() != null)
                 .collect(Collectors.toMap(ReserveMealDTO::mealId, ReserveMealDTO::quantity));
 
-        List<Meal> mealsEntities = mealRepository.findAllById(mealIds);
-        List<MealDTO> mealDTOs = mealMapper.toDTOList(mealsEntities);
+        if (!regularMealIds.isEmpty()) {
+            List<Meal> mealsEntities = mealRepository.findAllById(regularMealIds);
+            List<MealDTO> mealDTOs = mealMapper.toDTOList(mealsEntities);
 
-        Map<Long, Double> deductions = new HashMap<>();
-        for (MealDTO meal : mealDTOs) {
-            double orderedQty = quantityByMealId.getOrDefault(meal.id(), 0);
-            if (meal.mealIngredients() == null) continue;
-            for (MealIngredientDTO mi : meal.mealIngredients()) {
-                // multiply the grams per serving by the number of meals ordered
-                double gramsNeeded = mi.quantityGrams() * orderedQty;
-                deductions.merge(mi.ingredient().id(), gramsNeeded, Double::sum);
+            for (MealDTO meal : mealDTOs) {
+                double orderedQty = quantityByMealId.getOrDefault(meal.id(), 0);
+                if (meal.mealIngredients() == null) continue;
+                for (MealIngredientDTO mi : meal.mealIngredients()) {
+                    double gramsNeeded = mi.quantityGrams() * orderedQty;
+                    deductions.merge(mi.ingredient().id(), gramsNeeded, Double::sum);
+                }
             }
         }
+
+        // Process custom bowls
+        meals.stream()
+                .filter(m -> m.mealId() == null && m.customizations() != null)
+                .forEach(m -> {
+                    m.customizations().forEach((ingredientId, grams) -> {
+                        double gramsNeeded = grams * m.quantity();
+                        deductions.merge(ingredientId, gramsNeeded, Double::sum);
+                    });
+                });
+
         return deductions;
     }
 }

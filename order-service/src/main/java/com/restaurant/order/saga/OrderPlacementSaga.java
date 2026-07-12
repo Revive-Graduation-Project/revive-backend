@@ -68,7 +68,7 @@ public class OrderPlacementSaga {
 
         // ── Step 1: Fetch price snapshots (outside any DB transaction) ─────────
         Map<Long, MealPriceSnapshot> snapshots = fetchSnapshots(request);
-        Map<Long, IngredientDTO> ingredientMap  = fetchIngredients(request);
+        Map<Long, IngredientDTO> ingredientMap = fetchIngredients(request);
 
         // ── Step 2: Build the order via pure domain service ───────────────────
         Order order = orderDomainService.buildOrder(request, clientId, snapshots, ingredientMap);
@@ -78,11 +78,14 @@ public class OrderPlacementSaga {
         try {
 
             // Step 3: Reserve stock
-            List<OrderItemRequest> stockItems = toStockItems(order);
+            List<com.restaurant.order.dto.request.ReserveMealRequest> stockItems = toStockItems(order);
             menuClient.reserveStock(stockItems);
             compensations.push(() -> {
-                try { menuClient.rollbackStock(stockItems); }
-                catch (Exception e) { log.error("Compensation: rollbackStock failed", e); }
+                try {
+                    menuClient.rollbackStock(stockItems);
+                } catch (Exception e) {
+                    log.error("Compensation: rollbackStock failed", e);
+                }
             });
 
             // Step 4: Persist initial order
@@ -102,22 +105,25 @@ public class OrderPlacementSaga {
                         messagePublisher.publishPointRedemptionRollback(
                                 new PointRedemptionRollbackRequestedEvent(saved.getId(), clientId, pointsToRedeem),
                                 UUID.randomUUID().toString(), UUID.randomUUID().toString());
-                    } catch (Exception e) { log.error("Compensation: rollback points failed", e); }
+                    } catch (Exception e) {
+                        log.error("Compensation: rollback points failed", e);
+                    }
                 });
             } else if (!request.paymentMethod().equals(PaymentMethod.CASH)) {
                 saved.setStatus(OrderStatus.AWAITING_PAYMENT);
-                PaymentServiceClient.PaymentIntentResponse intent =
-                        paymentServiceClient.createPaymentIntent(saved.getId(), clientId, saved.getTotalPrice(), "egp");
+                PaymentServiceClient.PaymentIntentResponse intent = paymentServiceClient
+                        .createPaymentIntent(saved.getId(), clientId, saved.getTotalPrice(), "egp");
                 saved.setStripePaymentIntentId(intent.paymentIntentId());
                 saved.setStripeClientSecret(intent.clientSecret());
                 self.updateOrder(saved);
                 compensations.push(() -> {
-                    try { 
+                    try {
                         messagePublisher.publishPaymentRefund(
                                 new PaymentRefundRequestedEvent(saved.getId(), clientId, saved.getTotalPrice()),
                                 UUID.randomUUID().toString(), UUID.randomUUID().toString());
+                    } catch (Exception e) {
+                        log.error("Compensation: publishPaymentRefund failed", e);
                     }
-                    catch (Exception e) { log.error("Compensation: publishPaymentRefund failed", e); }
                 });
             } else {
                 log.info("OrderPlacementSaga: CASH payment for order={}, publishing OrderCreated", saved.getId());
@@ -174,21 +180,30 @@ public class OrderPlacementSaga {
         return mealIds.stream()
                 .collect(Collectors.toMap(
                         id -> id,
-                        id -> menuClient.getMealById(id)
-                ));
+                        id -> menuClient.getMealById(id)));
     }
 
     private Map<Long, IngredientDTO> fetchIngredients(PlaceOrderRequest request) {
         boolean hasCustomMeals = request.items().stream().anyMatch(i -> i.mealId() == null);
-        if (!hasCustomMeals) return Map.of();
+        if (!hasCustomMeals)
+            return Map.of();
         return menuClient.getAllIngredients().stream()
                 .collect(Collectors.toMap(IngredientDTO::id, i -> i));
     }
 
-    private List<OrderItemRequest> toStockItems(Order order) {
+    private List<com.restaurant.order.dto.request.ReserveMealRequest> toStockItems(Order order) {
         return order.getItems().stream()
-                .filter(item -> item.getMealId() != null)
-                .map(item -> new OrderItemRequest(item.getMealId(), null, item.getQuantity()))
+                .map(item -> {
+                    Map<Long, Double> customizations = null;
+                    if (item.getCustomizations() != null) {
+                        customizations = item.getCustomizations().entrySet().stream()
+                                .collect(Collectors.toMap(
+                                        e -> Long.parseLong(e.getKey()),
+                                        e -> Double.parseDouble(e.getValue().toString())));
+                    }
+                    return new com.restaurant.order.dto.request.ReserveMealRequest(item.getMealId(), item.getQuantity(),
+                            customizations);
+                })
                 .toList();
     }
 }
