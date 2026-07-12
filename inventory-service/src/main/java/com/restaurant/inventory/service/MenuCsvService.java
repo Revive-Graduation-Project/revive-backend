@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurant.inventory.dto.IngredientEntry;
 import com.restaurant.inventory.dto.IngredientNutrition;
 import com.restaurant.inventory.dto.MealNutrition;
-import com.restaurant.inventory.dto.ImportResponse;
 import com.restaurant.inventory.dto.NormalizedIngredient;
 import com.restaurant.inventory.dto.UsdaFoodDetail;
 import com.restaurant.inventory.dto.InvalidMealEntry;
@@ -119,16 +118,7 @@ public class MenuCsvService {
             throw new RuntimeException("Step 2 Failed: CSV Parsing Error - " + e.getMessage(), e);
         }
 
-        return runPipeline(menuMap, file.getOriginalFilename());
-    }
-
-    public ImportResponse importFromJson(List<CsvParserHelper.MealCsvEntry> meals) {
-        LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap = new LinkedHashMap<>();
-        for (CsvParserHelper.MealCsvEntry meal : meals) {
-            menuMap.put(meal.mealName(), meal);
-        }
-        List<MealNutrition> result = runPipeline(menuMap, "JSON import");
-        return new ImportResponse("Import started — " + result.size() + " meals queued for processing.", result.size());
+        return runPipeline(menuMap, file.getOriginalFilename(), null);
     }
 
     @Async
@@ -145,88 +135,8 @@ public class MenuCsvService {
             menuMap.put(meal.mealName(), meal);
         }
 
-        List<MealNutrition> result = new ArrayList<>();
         try {
-            // ── Batch AI Normalization ──────────────────────────────────────────────
-            List<String> allUniqueIngredients = menuMap.values().stream()
-                    .flatMap(meal -> meal.ingredients().stream())
-                    .map(com.restaurant.inventory.dto.IngredientEntry::name)
-                    .distinct()
-                    .toList();
-
-            final Map<String, NormalizedIngredient> normalizedCache;
-            try {
-                normalizedCache = allUniqueIngredients.isEmpty()
-                        ? Map.of()
-                        : batchNormalizeIngredients(allUniqueIngredients);
-            } catch (Exception e) {
-                throw new RuntimeException("AI Normalization failed: " + e.getMessage(), e);
-            }
-
-            int processed = 0;
-            for (var entry : menuMap.entrySet()) {
-                // ── Check for cancellation before each meal ──────────────────────────
-                ImportJob current = importJobRepository.findById(jobId).orElseThrow();
-                if (current.getStatus() == ImportJob.ImportStatus.CANCELED) {
-                    log.info("Job {} cancelled mid-processing. Aborting.", jobId);
-                    return;
-                }
-
-                String mealName = entry.getKey();
-                CsvParserHelper.MealCsvEntry mealCsvEntry = entry.getValue();
-                List<com.restaurant.inventory.dto.IngredientEntry> ingredients = mealCsvEntry.ingredients();
-
-                List<NormalizedIngredient> normalized = ingredients.stream()
-                        .map(i -> normalizedCache.getOrDefault(i.name(),
-                                new NormalizedIngredient(i.name(), i.name())))
-                        .toList();
-
-                Map<String, Double> quantityMap = ingredients.stream()
-                        .collect(Collectors.toMap(
-                            com.restaurant.inventory.dto.IngredientEntry::name,
-                            com.restaurant.inventory.dto.IngredientEntry::quantity));
-
-                List<UsdaFoodDetail> foodDetails;
-                try {
-                    foodDetails = usdaService.fetchNutrients(normalized, quantityMap);
-                } catch (Exception e) {
-                    throw new RuntimeException("USDA fetch failed for '" + mealName + "': " + e.getMessage(), e);
-                }
-
-                List<IngredientNutrition> ingredientNutritions = foodDetails.stream().map(food -> {
-                    com.restaurant.inventory.dto.IngredientEntry originalEntry = ingredients.stream()
-                            .filter(i -> i.name().equals(food.originalName()))
-                            .findFirst()
-                            .orElse(new com.restaurant.inventory.dto.IngredientEntry(food.originalName(), 0, ""));
-                    return new IngredientNutrition(
-                            food.originalName(),
-                            originalEntry.quantity(),
-                            originalEntry.unit(),
-                            food.fdcId(),
-                            food.description(),
-                            food.foodCategory(),
-                            food.foodNutrients());
-                }).toList();
-
-                result.add(new MealNutrition(
-                        mealName,
-                        mealCsvEntry.category(),
-                        mealCsvEntry.price(),
-                        mealCsvEntry.description(),
-                        ingredientNutritions));
-
-                // ── Heartbeat: update progress after each meal ────────────────────────
-                processed++;
-                current.setProcessedRecords(processed);
-                current.setMessage("Processing " + processed + " / " + meals.size());
-                current.setUpdatedAt(LocalDateTime.now());
-                importJobRepository.save(current);
-
-                log.info("[Job {}] Processed meal '{}' ({}/{})", jobId, mealName, processed, meals.size());
-            }
-
-            // ── Publish event only if all meals succeeded ────────────────────────────
-            menuNutritionPublisher.publish(new MenuNutritionEvent(result));
+            List<MealNutrition> result = runPipeline(menuMap, "JSON import", jobId);
 
             // ── Mark as COMPLETED ────────────────────────────────────────────────────
             ImportJob finalJob = importJobRepository.findById(jobId).orElseThrow();
@@ -237,6 +147,9 @@ public class MenuCsvService {
             importJobRepository.save(finalJob);
             log.info("[Job {}] Completed — {} meals imported.", jobId, result.size());
 
+        } catch (java.util.concurrent.CancellationException ce) {
+            log.info("[Job {}] Cancelled during processing.", jobId);
+            // Status is already set to CANCELED by the admin, so we just return.
         } catch (Exception e) {
             log.error("[Job {}] Failed: {}", jobId, e.getMessage(), e);
             importJobRepository.findById(jobId).ifPresent(j -> {
@@ -253,7 +166,7 @@ public class MenuCsvService {
     /**
      * Shared pipeline — called by both endpoints after parsing is done
      */
-    public List<MealNutrition> runPipeline(LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap, String sourceLabel) {
+    public List<MealNutrition> runPipeline(LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap, String sourceLabel, String jobId) {
         List<MealNutrition> result = new ArrayList<>();
 
         try {
@@ -278,7 +191,17 @@ public class MenuCsvService {
                 log.info("Successfully normalized {} unique ingredients via AI", normalizedCache.size());
             }
 
+            int processed = 0;
+            int total = menuMap.size();
             for (var entry : menuMap.entrySet()) {
+                // ── Check for cancellation before each meal ──────────────────────────
+                if (jobId != null) {
+                    ImportJob current = importJobRepository.findById(jobId).orElseThrow();
+                    if (current.getStatus() == ImportJob.ImportStatus.CANCELED) {
+                        log.info("Job {} cancelled mid-processing. Aborting.", jobId);
+                        throw new java.util.concurrent.CancellationException("Import cancelled by admin.");
+                    }
+                }
                 String mealName = entry.getKey();
                 CsvParserHelper.MealCsvEntry mealCsvEntry = entry.getValue();
                 List<IngredientEntry> ingredients = mealCsvEntry.ingredients();
@@ -331,8 +254,17 @@ public class MenuCsvService {
                         mealCsvEntry.description(),
                         ingredientNutritions);
                 result.add(mealNutrition);
-
                 log.info("Processed ingredients and nutrients for meal '{}'", mealName);
+
+                // ── Heartbeat: update progress after each meal ────────────────────────
+                if (jobId != null) {
+                    processed++;
+                    ImportJob current = importJobRepository.findById(jobId).orElseThrow();
+                    current.setProcessedRecords(processed);
+                    current.setMessage("Processing " + processed + " / " + total);
+                    current.setUpdatedAt(LocalDateTime.now());
+                    importJobRepository.save(current);
+                }
             }
 
             // ── Step 5: Publish event (only reached if ALL meals succeeded) ──

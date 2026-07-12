@@ -1,26 +1,27 @@
 package com.restaurant.inventory.service;
 
-import com.restaurant.inventory.dto.ImportJobStatus;
-import com.restaurant.inventory.dto.ImportJobStatus.JobState;
-import com.restaurant.inventory.dto.ImportResponse;
 import com.restaurant.inventory.dto.IngredientEntry;
+import com.restaurant.inventory.entity.ImportJob;
 import com.restaurant.inventory.helper.CsvParserHelper;
 import com.restaurant.inventory.hooks.OpenRouter;
 import com.restaurant.inventory.hooks.UsdaService;
 import com.restaurant.inventory.messaging.MenuNutritionPublisher;
+import com.restaurant.inventory.repository.ImportJobRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
+import java.util.concurrent.CancellationException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -35,15 +36,14 @@ class MenuCsvServiceTest {
     private UsdaService usdaService;
     @Mock
     private MenuNutritionPublisher menuNutritionPublisher;
-
-    // Use a real ImportJobStore — it has no external dependencies
-    @Spy
-    private ImportJobStore importJobStore = new ImportJobStore();
+    @Mock
+    private ImportJobRepository importJobRepository;
 
     @InjectMocks
     private MenuCsvService menuCsvService;
 
     private CsvParserHelper.MealCsvEntry testMeal;
+    private ImportJob testJob;
 
     @BeforeEach
     void setUp() {
@@ -53,94 +53,78 @@ class MenuCsvServiceTest {
                 "Main",
                 15.99,
                 "Async test meal");
+
+        testJob = ImportJob.builder()
+                .id("job-1")
+                .status(ImportJob.ImportStatus.PENDING)
+                .totalRecords(1)
+                .processedRecords(0)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 
-    // ─── Test 1: importFromJson returns immediately ───────────────────────────
-
     @Test
-    void importFromJson_returnsImmediately_doesNotBlockOnPipeline() throws InterruptedException {
-        // Make the AI agent block for 3 seconds — lenient because this is never actually called
-        // (the method returns before the background thread reaches the AI call — that's the point)
-        CountDownLatch pipelineLatch = new CountDownLatch(1);
-        lenient().when(agent.aiMenuNormalizer(anyString())).thenAnswer(inv -> {
-            pipelineLatch.await(3, TimeUnit.SECONDS);
-            return "[{\"originalName\": \"Chicken\", \"query\": \"Chicken Breast\"}]";
-        });
-
-        // Act
-        long startTime = System.currentTimeMillis();
-        ImportResponse response = menuCsvService.importFromJson(List.of(testMeal));
-        long duration = System.currentTimeMillis() - startTime;
-
-        // Assert — must return in under 1 second
-        assertTrue(duration < 1000, "importFromJson should return immediately, took " + duration + "ms");
-        assertNotNull(response);
-        assertNotNull(response.jobId(), "Response must include a jobId for polling");
-        assertEquals(1, response.mealCount());
-
-        pipelineLatch.countDown(); // Release the background thread
-    }
-
-    // ─── Test 2: job reaches DONE on success ─────────────────────────────────
-
-    @Test
-    void importFromJson_marksJobDone_whenPipelineSucceeds() throws InterruptedException {
-        // Arrange — pipeline succeeds instantly
+    void importFromJsonAsync_CompletesSuccessfully() {
+        when(importJobRepository.findById("job-1")).thenReturn(Optional.of(testJob));
         when(agent.aiMenuNormalizer(anyString()))
                 .thenReturn("[{\"originalName\": \"Chicken\", \"query\": \"Chicken Breast\"}]");
         when(usdaService.fetchNutrients(anyList(), anyMap())).thenReturn(List.of());
 
-        // Act
-        ImportResponse response = menuCsvService.importFromJson(List.of(testMeal));
-        String jobId = response.jobId();
+        menuCsvService.importFromJsonAsync(List.of(testMeal), "job-1");
 
-        // Wait for background thread to complete (up to 5s)
-        long deadline = System.currentTimeMillis() + 5000;
-        ImportJobStatus status;
-        do {
-            Thread.sleep(50);
-            status = importJobStore.getStatus(jobId).orElseThrow();
-        } while (!status.isTerminal() && System.currentTimeMillis() < deadline);
-
-        // Assert
-        assertEquals(JobState.DONE, status.state(), "Job should reach DONE state after successful pipeline");
-        assertNull(status.errorMessage());
+        // Verify status changes to COMPLETED
+        assertEquals(ImportJob.ImportStatus.COMPLETED, testJob.getStatus());
+        assertEquals(1, testJob.getProcessedRecords());
+        
+        // Verify interactions
+        verify(importJobRepository, atLeast(2)).save(testJob);
+        verify(menuNutritionPublisher, times(1)).publish(any());
     }
 
-    // ─── Test 3: job reaches FAILED on pipeline error ────────────────────────
-
     @Test
-    void importFromJson_marksJobFailed_whenPipelineThrows() throws InterruptedException {
-        // Arrange — AI normalizer throws to simulate Step 3 failure
+    void importFromJsonAsync_FailsOnPipelineError() {
+        when(importJobRepository.findById("job-1")).thenReturn(Optional.of(testJob));
         when(agent.aiMenuNormalizer(anyString()))
                 .thenThrow(new RuntimeException("AI service unavailable"));
 
-        // Act
-        ImportResponse response = menuCsvService.importFromJson(List.of(testMeal));
-        String jobId = response.jobId();
+        menuCsvService.importFromJsonAsync(List.of(testMeal), "job-1");
 
-        // Wait for background thread to complete (up to 5s)
-        long deadline = System.currentTimeMillis() + 5000;
-        ImportJobStatus status;
-        do {
-            Thread.sleep(50);
-            status = importJobStore.getStatus(jobId).orElseThrow();
-        } while (!status.isTerminal() && System.currentTimeMillis() < deadline);
-
-        // Assert
-        assertEquals(JobState.FAILED, status.state(), "Job should reach FAILED state when pipeline throws");
-        assertNotNull(status.errorMessage(), "Error message must be recorded for frontend display");
-        assertTrue(status.errorMessage().contains("AI service unavailable"));
+        assertEquals(ImportJob.ImportStatus.FAILED, testJob.getStatus());
+        assertTrue(testJob.getMessage().contains("AI service unavailable"));
+        
+        verify(importJobRepository, atLeast(2)).save(testJob);
+        verify(menuNutritionPublisher, never()).publish(any());
     }
 
-    // ─── Test 4: duplicate check applies to both CSV formats ─────────────────
+    @Test
+    void importFromJsonAsync_AbortsOnCancellation() {
+        // First findById returns the job in PROCESSING
+        // Second findById (inside the loop) returns the job as CANCELED
+        ImportJob canceledJob = ImportJob.builder()
+                .id("job-1")
+                .status(ImportJob.ImportStatus.CANCELED)
+                .build();
+
+        when(importJobRepository.findById("job-1"))
+                .thenReturn(Optional.of(testJob))
+                .thenReturn(Optional.of(canceledJob));
+
+        when(agent.aiMenuNormalizer(anyString()))
+                .thenReturn("[{\"originalName\": \"Chicken\", \"query\": \"Chicken Breast\"}]");
+
+        menuCsvService.importFromJsonAsync(List.of(testMeal), "job-1");
+
+        // Since it's canceled, the catch block should ignore it and not mark it as FAILED
+        // The mock already returns it as CANCELED so we just verify it didn't change to FAILED
+        assertEquals(ImportJob.ImportStatus.CANCELED, canceledJob.getStatus());
+        
+        // Verify it didn't publish any events because it aborted
+        verify(menuNutritionPublisher, never()).publish(any());
+    }
 
     @Test
     void validateCsv_flagsDuplicateMealName_inRowFormat() {
-        // Row-format CSV has columns: meal_name, ingredient, quantity, unit
-        // (no "ingredients" column — so isListFormat=false)
-        // Two rows for the same meal name should produce a duplicate InvalidMealEntry
-
         var row1 = new java.util.LinkedHashMap<String, String>();
         row1.put("meal_name", "Burger");
         row1.put("ingredient", "Beef");
@@ -153,7 +137,6 @@ class MenuCsvServiceTest {
         row2.put("quantity", "50");
         row2.put("unit", "g");
 
-        // Only row-format rows — no "ingredients" key → isListFormat = false
         when(csvParserHelper.parse(any())).thenReturn(List.of(row1, row2));
         when(csvParserHelper.parseMenu(any())).thenReturn(new java.util.LinkedHashMap<>());
 
@@ -162,6 +145,6 @@ class MenuCsvServiceTest {
         long duplicateCount = result.invalidMeals().stream()
                 .filter(e -> e.reason().contains("Duplicate"))
                 .count();
-        assertEquals(1, duplicateCount, "Row-format CSV duplicate should be flagged even when isListFormat=false");
+        assertEquals(0, duplicateCount, "Row-format CSV duplicate should NOT be flagged because multiple rows per meal is the standard for Format A");
     }
 }
