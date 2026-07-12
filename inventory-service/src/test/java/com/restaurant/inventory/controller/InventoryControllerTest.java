@@ -161,7 +161,8 @@ public class InventoryControllerTest {
     public void testGetActiveJob_ReturnsNoContentWhenEmpty() throws Exception {
         when(importJobService.getActiveJob()).thenReturn(java.util.Optional.empty());
 
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/inventory/import-jobs/active"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inventory/import-jobs/active")
+                        .header("X-User-Role", "ADMIN"))
                 .andExpect(status().isNoContent());
     }
 

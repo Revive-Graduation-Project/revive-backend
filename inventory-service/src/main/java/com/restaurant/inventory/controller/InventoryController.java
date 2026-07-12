@@ -78,7 +78,12 @@ public class InventoryController {
 
     // ── Get status of a specific job ──────────────────────────────────
     @GetMapping("/import-status/{jobId}")
-    public ResponseEntity<ImportJobDto> getImportStatus(@PathVariable String jobId) {
+    public ResponseEntity<ImportJobDto> getImportStatus(
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable String jobId) {
+        if (!isAdminOrManager(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         return importJobService.getJobStatus(jobId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -86,13 +91,22 @@ public class InventoryController {
 
     // ── Get full history ──────────────────────────────────────────────
     @GetMapping("/import-jobs")
-    public ResponseEntity<List<ImportJobDto>> getAllImportJobs() {
-        return ResponseEntity.ok(importJobService.getAllJobs());
+    public ResponseEntity<org.springframework.data.domain.Page<ImportJobDto>> getAllImportJobs(
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        if (!isAdminOrManager(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(importJobService.getAllJobs(pageable));
     }
 
     // ── Get currently active job (with heartbeat timeout check) ───────
     @GetMapping("/import-jobs/active")
-    public ResponseEntity<ImportJobDto> getActiveImportJob() {
+    public ResponseEntity<ImportJobDto> getActiveImportJob(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAdminOrManager(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         return importJobService.getActiveJob()
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());

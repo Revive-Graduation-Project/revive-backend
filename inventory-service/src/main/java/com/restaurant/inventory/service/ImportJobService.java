@@ -14,6 +14,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -60,13 +64,11 @@ public class ImportJobService {
     }
 
     /**
-     * Returns all jobs ordered by creation time descending.
+     * Returns a page of jobs ordered by creation time descending.
      */
-    public List<ImportJobDto> getAllJobs() {
-        return importJobRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(ImportJobDto::from)
-                .toList();
+    public Page<ImportJobDto> getAllJobs(Pageable pageable) {
+        return importJobRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(ImportJobDto::from);
     }
 
     /**
@@ -76,6 +78,7 @@ public class ImportJobService {
      * is automatically marked FAILED (server crash / restart scenario) before the
      * active job is resolved.
      */
+    @Transactional
     public Optional<ImportJobDto> getActiveJob() {
         List<ImportJob> activeJobs = importJobRepository.findActiveJobs();
 
@@ -102,16 +105,17 @@ public class ImportJobService {
      * The async pipeline in MenuCsvService polls the DB before each meal
      * and will abort when it sees the CANCELED status.
      */
+    @Transactional
     public Optional<ImportJobDto> cancelJob(String jobId) {
-        return importJobRepository.findById(jobId).map(job -> {
-            if (job.getStatus() == ImportJob.ImportStatus.PROCESSING
-                    || job.getStatus() == ImportJob.ImportStatus.PENDING) {
-                job.setStatus(ImportJob.ImportStatus.CANCELED);
-                job.setMessage("Cancelled by admin.");
-                importJobRepository.save(job);
-                log.info("Job {} cancelled", jobId);
-            }
-            return ImportJobDto.from(job);
-        });
+        int updated = importJobRepository.updateStatusIf(
+                jobId,
+                ImportJob.ImportStatus.CANCELED,
+                "Cancelled by admin.",
+                List.of(ImportJob.ImportStatus.PROCESSING, ImportJob.ImportStatus.PENDING)
+        );
+        if (updated > 0) {
+            log.info("Job {} cancelled by admin", jobId);
+        }
+        return importJobRepository.findById(jobId).map(ImportJobDto::from);
     }
 }

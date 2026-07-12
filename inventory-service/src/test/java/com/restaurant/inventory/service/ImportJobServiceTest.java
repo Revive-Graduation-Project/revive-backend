@@ -109,12 +109,17 @@ public class ImportJobServiceTest {
 
     @Test
     void cancelJob_ShouldMarkCanceled_WhenProcessing() {
+        when(importJobRepository.updateStatusIf(eq("job-1"), eq(ImportJob.ImportStatus.CANCELED), anyString(), anyList()))
+                .thenAnswer(inv -> {
+                    activeJob.setStatus(ImportJob.ImportStatus.CANCELED);
+                    return 1;
+                });
         when(importJobRepository.findById("job-1")).thenReturn(Optional.of(activeJob));
 
         Optional<ImportJobDto> result = importJobService.cancelJob("job-1");
 
         assertTrue(result.isPresent());
         assertEquals(ImportJob.ImportStatus.CANCELED, result.get().status());
-        verify(importJobRepository, times(1)).save(activeJob);
+        verify(importJobRepository, times(1)).updateStatusIf(eq("job-1"), eq(ImportJob.ImportStatus.CANCELED), anyString(), anyList());
     }
 }

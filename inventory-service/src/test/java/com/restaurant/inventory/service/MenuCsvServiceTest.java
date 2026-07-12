@@ -66,61 +66,50 @@ class MenuCsvServiceTest {
 
     @Test
     void importFromJsonAsync_CompletesSuccessfully() {
-        when(importJobRepository.findById("job-1")).thenReturn(Optional.of(testJob));
+        when(importJobRepository.startProcessingIf(eq("job-1"), any(), anyString(), eq(1), anyList())).thenReturn(1);
+        when(importJobRepository.updateStatusAndProgressIf(eq("job-1"), any(), anyString(), eq(1), anyList())).thenReturn(1);
         when(agent.aiMenuNormalizer(anyString()))
                 .thenReturn("[{\"originalName\": \"Chicken\", \"query\": \"Chicken Breast\"}]");
         when(usdaService.fetchNutrients(anyList(), anyMap())).thenReturn(List.of());
+        when(importJobRepository.findById("job-1")).thenReturn(Optional.of(testJob)); // for cancellation check
 
         menuCsvService.importFromJsonAsync(List.of(testMeal), "job-1");
 
-        // Verify status changes to COMPLETED
-        assertEquals(ImportJob.ImportStatus.COMPLETED, testJob.getStatus());
-        assertEquals(1, testJob.getProcessedRecords());
-        
-        // Verify interactions
-        verify(importJobRepository, atLeast(2)).save(testJob);
+        verify(importJobRepository).updateStatusAndProgressIf(eq("job-1"), eq(ImportJob.ImportStatus.COMPLETED), anyString(), eq(1), anyList());
         verify(menuNutritionPublisher, times(1)).publish(any());
     }
 
     @Test
     void importFromJsonAsync_FailsOnPipelineError() {
-        when(importJobRepository.findById("job-1")).thenReturn(Optional.of(testJob));
+        when(importJobRepository.startProcessingIf(eq("job-1"), any(), anyString(), eq(1), anyList())).thenReturn(1);
         when(agent.aiMenuNormalizer(anyString()))
                 .thenThrow(new RuntimeException("AI service unavailable"));
 
         menuCsvService.importFromJsonAsync(List.of(testMeal), "job-1");
 
-        assertEquals(ImportJob.ImportStatus.FAILED, testJob.getStatus());
-        assertTrue(testJob.getMessage().contains("AI service unavailable"));
-        
-        verify(importJobRepository, atLeast(2)).save(testJob);
+        verify(importJobRepository).updateStatusIf(eq("job-1"), eq(ImportJob.ImportStatus.FAILED), anyString(), anyList());
         verify(menuNutritionPublisher, never()).publish(any());
     }
 
     @Test
     void importFromJsonAsync_AbortsOnCancellation() {
-        // First findById returns the job in PROCESSING
-        // Second findById (inside the loop) returns the job as CANCELED
+        when(importJobRepository.startProcessingIf(eq("job-1"), any(), anyString(), eq(1), anyList())).thenReturn(1);
+        
         ImportJob canceledJob = ImportJob.builder()
                 .id("job-1")
                 .status(ImportJob.ImportStatus.CANCELED)
                 .build();
 
-        when(importJobRepository.findById("job-1"))
-                .thenReturn(Optional.of(testJob))
-                .thenReturn(Optional.of(canceledJob));
-
         when(agent.aiMenuNormalizer(anyString()))
                 .thenReturn("[{\"originalName\": \"Chicken\", \"query\": \"Chicken Breast\"}]");
 
+        when(importJobRepository.findById("job-1")).thenReturn(Optional.of(canceledJob));
+
         menuCsvService.importFromJsonAsync(List.of(testMeal), "job-1");
 
-        // Since it's canceled, the catch block should ignore it and not mark it as FAILED
-        // The mock already returns it as CANCELED so we just verify it didn't change to FAILED
-        assertEquals(ImportJob.ImportStatus.CANCELED, canceledJob.getStatus());
-        
-        // Verify it didn't publish any events because it aborted
         verify(menuNutritionPublisher, never()).publish(any());
+        // FAILED should not be set because we abort on CancellationException
+        verify(importJobRepository, never()).updateStatusIf(eq("job-1"), eq(ImportJob.ImportStatus.FAILED), anyString(), anyList());
     }
 
     @Test

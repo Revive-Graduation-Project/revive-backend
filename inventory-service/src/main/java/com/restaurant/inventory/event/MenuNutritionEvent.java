@@ -9,5 +9,8 @@ import java.util.List;
  * from a CSV upload. The menu-management-service listens for this event
  * and persists the meals.
  */
-public record MenuNutritionEvent(List<MealNutrition> meals) {
+public record MenuNutritionEvent(List<MealNutrition> meals, String jobId) {
+    public MenuNutritionEvent(List<MealNutrition> meals) {
+        this(meals, null);
+    }
 }

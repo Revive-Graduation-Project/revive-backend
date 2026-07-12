@@ -77,6 +77,13 @@ public class MenuCsvService {
                     rIdx++;
                 }
                 invalid.add(new InvalidMealEntry(rIdx, meal.mealName(), "No ingredients found"));
+            } else if (meal.price() <= 0) {
+                int rIdx = 1;
+                for (Map<String, String> r : rows) {
+                    if (meal.mealName().equals(r.get("meal_name"))) break;
+                    rIdx++;
+                }
+                invalid.add(new InvalidMealEntry(rIdx, meal.mealName(), "Meal price must be greater than zero"));
             } else {
                 // If it's list format and was a duplicate, it's already in invalid, so don't add to valid.
                 // Actually, if it's a duplicate, we only want the first one to be valid?
@@ -122,29 +129,38 @@ public class MenuCsvService {
     }
 
     @Async
+    @org.springframework.transaction.annotation.Transactional
     public void importFromJsonAsync(List<CsvParserHelper.MealCsvEntry> meals, String jobId) {
-        ImportJob job = importJobRepository.findById(jobId).orElseThrow();
-        job.setStatus(ImportJob.ImportStatus.PROCESSING);
-        job.setTotalRecords(meals.size());
-        job.setProcessedRecords(0);
-        job.setMessage("Processing...");
-        importJobRepository.save(job);
+        int started = importJobRepository.startProcessingIf(
+                jobId,
+                ImportJob.ImportStatus.PROCESSING,
+                "Processing...",
+                meals.size(),
+                List.of(ImportJob.ImportStatus.PENDING)
+        );
+        if (started == 0) {
+            log.info("[Job {}] Cancelled before starting.", jobId);
+            return;
+        }
 
         LinkedHashMap<String, CsvParserHelper.MealCsvEntry> menuMap = new LinkedHashMap<>();
         for (CsvParserHelper.MealCsvEntry meal : meals) {
             menuMap.put(meal.mealName(), meal);
         }
 
+        boolean published = false;
         try {
             List<MealNutrition> result = runPipeline(menuMap, "JSON import", jobId);
+            published = true;
 
             // ── Mark as COMPLETED ────────────────────────────────────────────────────
-            ImportJob finalJob = importJobRepository.findById(jobId).orElseThrow();
-            finalJob.setStatus(ImportJob.ImportStatus.COMPLETED);
-            finalJob.setMessage("Successfully imported " + result.size() + " meals.");
-            finalJob.setProcessedRecords(result.size());
-            finalJob.setUpdatedAt(LocalDateTime.now());
-            importJobRepository.save(finalJob);
+            importJobRepository.updateStatusAndProgressIf(
+                    jobId,
+                    ImportJob.ImportStatus.COMPLETED,
+                    "Successfully imported " + result.size() + " meals.",
+                    result.size(),
+                    List.of(ImportJob.ImportStatus.PROCESSING)
+            );
             log.info("[Job {}] Completed — {} meals imported.", jobId, result.size());
 
         } catch (java.util.concurrent.CancellationException ce) {
@@ -152,14 +168,16 @@ public class MenuCsvService {
             // Status is already set to CANCELED by the admin, so we just return.
         } catch (Exception e) {
             log.error("[Job {}] Failed: {}", jobId, e.getMessage(), e);
-            importJobRepository.findById(jobId).ifPresent(j -> {
-                if (j.getStatus() != ImportJob.ImportStatus.CANCELED) {
-                    j.setStatus(ImportJob.ImportStatus.FAILED);
-                    j.setMessage("Import failed: " + e.getMessage());
-                    j.setUpdatedAt(LocalDateTime.now());
-                    importJobRepository.save(j);
-                }
-            });
+            if (!published) {
+                importJobRepository.updateStatusIf(
+                        jobId,
+                        ImportJob.ImportStatus.FAILED,
+                        "Import failed: " + e.getMessage(),
+                        List.of(ImportJob.ImportStatus.PROCESSING)
+                );
+            } else {
+                log.warn("Job {} failed to save COMPLETED status, but event was successfully published.", jobId);
+            }
         }
     }
 
@@ -259,18 +277,24 @@ public class MenuCsvService {
                 // ── Heartbeat: update progress after each meal ────────────────────────
                 if (jobId != null) {
                     processed++;
-                    ImportJob current = importJobRepository.findById(jobId).orElseThrow();
-                    current.setProcessedRecords(processed);
-                    current.setMessage("Processing " + processed + " / " + total);
-                    current.setUpdatedAt(LocalDateTime.now());
-                    importJobRepository.save(current);
+                    int updated = importJobRepository.updateStatusAndProgressIf(
+                            jobId,
+                            ImportJob.ImportStatus.PROCESSING,
+                            "Processing " + processed + " / " + total,
+                            processed,
+                            List.of(ImportJob.ImportStatus.PROCESSING)
+                    );
+                    if (updated == 0) {
+                        log.info("Job {} cancelled mid-processing. Aborting.", jobId);
+                        throw new java.util.concurrent.CancellationException("Import cancelled by admin.");
+                    }
                 }
             }
 
             // ── Step 5: Publish event (only reached if ALL meals succeeded) ──
             log.info("Processed {} meals from '{}' — publishing event", result.size(), sourceLabel);
             try {
-                menuNutritionPublisher.publish(new MenuNutritionEvent(result));
+                menuNutritionPublisher.publish(new MenuNutritionEvent(result, jobId));
             } catch (Exception e) {
                 throw new RuntimeException("Step 6 Failed: RabbitMQ Publish Error - " + e.getMessage(), e);
             }
@@ -346,8 +370,8 @@ public class MenuCsvService {
                     }
                 }
                 if (!recovered) {
-                    log.error("Failed to parse AI JSON for chunk. Raw response: {}", aiResponse, e);
-                    throw new RuntimeException("Failed to parse AI JSON for batch chunk. Raw response: " + aiResponse, e);
+                    log.error("Failed to parse AI JSON for chunk. Raw response (DEBUG length: {})", aiResponse.length(), e);
+                    throw new RuntimeException("Failed to parse AI JSON for batch chunk. Output length: " + aiResponse.length(), e);
                 }
             }
         }
