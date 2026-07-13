@@ -26,8 +26,11 @@ public class CustomizationServiceImpl implements CustomizationService {
 
     @Override
     public BuildOptionsResponse getBuildOptions(String primaryCategory) {
-        MealTemplate template = mealTemplateRepository.findByPrimaryCategory(primaryCategory)
-                .orElseThrow(() -> new TemplateNotFoundException("No template found for category: " + primaryCategory));
+        MealTemplate template = mealTemplateRepository.findByPrimaryCategory(primaryCategory).orElse(null);
+
+        if (template == null) {
+            return new BuildOptionsResponse(primaryCategory, List.of());
+        }
 
         List<SlotOptions> slotOptions = template.getSlots().stream().map(slot -> {
             List<Ingredient> ingredients = ingredientRepository.findByCategoryAndStockGreaterThan(slot.getIngredientCategory(), 0.0);
