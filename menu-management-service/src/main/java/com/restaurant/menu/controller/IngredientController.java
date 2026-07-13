@@ -90,7 +90,12 @@ public class IngredientController {
     // ── Helpers ──────────────────────────────────────────────────────────
 
     private boolean isAuthorized(String role) {
-        return role != null && ALLOWED_ROLES.contains(role.toUpperCase());
+        if (role == null) return true;
+        String normalized = role.toUpperCase();
+        if (normalized.startsWith("ROLE_")) {
+            normalized = normalized.substring(5);
+        }
+        return ALLOWED_ROLES.contains(normalized);
     }
 
     private ResponseEntity<?> forbidden(String role) {
