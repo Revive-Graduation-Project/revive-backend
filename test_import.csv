@@ -1,0 +1,7 @@
+meal_name,category,price,description,ingredients
+Mushroom Swiss Burger,Burgers,145.0,Quarter pounder with sauteed mushrooms and melted swiss cheese,"Minced Beef:150 g; Burger Bun:90 g; Mushrooms:40 g; Swiss Cheese:30 g"
+Caesar Salad,Salads,,Fresh romaine lettuce with parmesan and creamy dressing,"Lettuce:100 g; Parmesan Cheese; Croutons:20 g"
+,Beverages,25.0,Refreshing canned soft drink,"Cola:330 ml"
+Spicy Chicken Wrap,Wraps,95.0,First CSV instance (mild version),"Chicken Breast:120 g; Pita Bread:80 g; Spicy Mayo:20 g"
+Spicy Chicken Wrap,Wraps,105.0,Second CSV instance (extra spicy version overwrites first),"Chicken Breast:150 g; Pita Bread:80 g; Extra Hot Sauce:30 g"
+Classic Smash Burger,Burgers,135.0,System duplicate (already exists in DB from seed script),"Minced Beef:180 g; Burger Bun:90 g; American Cheese:20 g"
