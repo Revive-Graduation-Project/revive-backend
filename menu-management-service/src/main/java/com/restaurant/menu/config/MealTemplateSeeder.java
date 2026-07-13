@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,53 +19,67 @@ public class MealTemplateSeeder implements CommandLineRunner {
     private final MealTemplateRepository mealTemplateRepository;
 
     @Override
+    @Transactional
     public void run(String... args) {
         log.info("Running MealTemplateSeeder...");
 
-        if (mealTemplateRepository.count() > 0) {
-            log.info("Meal templates already exist. Skipping seeding.");
-            return;
-        }
+        // Always re-seed to ensure correct USDA categories are present
+        mealTemplateRepository.deleteAll();
 
-        MealTemplate burgerTemplate = MealTemplate.builder()
-                .name("Custom Burger")
-                .primaryCategory("Burgers")
+        // 1. Poultry Products Template
+        MealTemplate poultryTemplate = MealTemplate.builder()
+                .name("Custom Poultry Bowl")
+                .primaryCategory("Poultry Products")
                 .build();
         
-        burgerTemplate.setSlots(List.of(
-                MealSlot.builder().template(burgerTemplate).slotName("Bun").ingredientCategory("Baked Products").maxSelect(1).isRequired(true).build(),
-                MealSlot.builder().template(burgerTemplate).slotName("Protein").ingredientCategory("Poultry Products").maxSelect(2).isRequired(true).build(),
-                MealSlot.builder().template(burgerTemplate).slotName("Protein (Beef)").ingredientCategory("Beef Products").maxSelect(2).isRequired(false).build(),
-                MealSlot.builder().template(burgerTemplate).slotName("Veggies").ingredientCategory("Vegetables and Vegetable Products").maxSelect(4).isRequired(false).build(),
-                MealSlot.builder().template(burgerTemplate).slotName("Cheese").ingredientCategory("Dairy and Egg Products").maxSelect(2).isRequired(false).build()
+        poultryTemplate.setSlots(List.of(
+                MealSlot.builder().template(poultryTemplate).slotName("Base").ingredientCategory("Cereal Grains and Pasta").maxSelect(1).isRequired(true).build(),
+                MealSlot.builder().template(poultryTemplate).slotName("Bread").ingredientCategory("Baked Products").maxSelect(1).isRequired(false).build(),
+                MealSlot.builder().template(poultryTemplate).slotName("Veggies").ingredientCategory("Vegetables and Vegetable Products").maxSelect(4).isRequired(false).build(),
+                MealSlot.builder().template(poultryTemplate).slotName("Cheese").ingredientCategory("Dairy and Egg Products").maxSelect(2).isRequired(false).build(),
+                MealSlot.builder().template(poultryTemplate).slotName("Sauce").ingredientCategory("Fats and Oils").maxSelect(2).isRequired(false).build()
         ));
 
-        MealTemplate grillTemplate = MealTemplate.builder()
-                .name("Custom Grill")
-                .primaryCategory("Grills")
+        // 2. Beef Products Template
+        MealTemplate beefTemplate = MealTemplate.builder()
+                .name("Custom Beef Bowl")
+                .primaryCategory("Beef Products")
                 .build();
         
-        grillTemplate.setSlots(List.of(
-                MealSlot.builder().template(grillTemplate).slotName("Protein").ingredientCategory("Poultry Products").maxSelect(2).isRequired(true).build(),
-                MealSlot.builder().template(grillTemplate).slotName("Protein (Beef)").ingredientCategory("Beef Products").maxSelect(2).isRequired(false).build(),
-                MealSlot.builder().template(grillTemplate).slotName("Side").ingredientCategory("Cereal Grains and Pasta").maxSelect(1).isRequired(true).build(),
-                MealSlot.builder().template(grillTemplate).slotName("Veggies").ingredientCategory("Vegetables and Vegetable Products").maxSelect(4).isRequired(false).build()
+        beefTemplate.setSlots(List.of(
+                MealSlot.builder().template(beefTemplate).slotName("Base").ingredientCategory("Cereal Grains and Pasta").maxSelect(1).isRequired(true).build(),
+                MealSlot.builder().template(beefTemplate).slotName("Bread").ingredientCategory("Baked Products").maxSelect(1).isRequired(false).build(),
+                MealSlot.builder().template(beefTemplate).slotName("Veggies").ingredientCategory("Vegetables and Vegetable Products").maxSelect(4).isRequired(false).build(),
+                MealSlot.builder().template(beefTemplate).slotName("Cheese").ingredientCategory("Dairy and Egg Products").maxSelect(2).isRequired(false).build(),
+                MealSlot.builder().template(beefTemplate).slotName("Sauce").ingredientCategory("Fats and Oils").maxSelect(2).isRequired(false).build()
         ));
 
-        MealTemplate saladTemplate = MealTemplate.builder()
-                .name("Custom Salad")
-                .primaryCategory("Salads")
+        // 3. Seafood Template
+        MealTemplate fishTemplate = MealTemplate.builder()
+                .name("Custom Seafood Bowl")
+                .primaryCategory("Finfish and Shellfish Products")
                 .build();
         
-        saladTemplate.setSlots(List.of(
-                MealSlot.builder().template(saladTemplate).slotName("Greens").ingredientCategory("Vegetables and Vegetable Products").maxSelect(2).isRequired(true).build(),
-                MealSlot.builder().template(saladTemplate).slotName("Protein").ingredientCategory("Poultry Products").maxSelect(2).isRequired(false).build(),
-                MealSlot.builder().template(saladTemplate).slotName("Cheese").ingredientCategory("Dairy and Egg Products").maxSelect(2).isRequired(false).build(),
-                MealSlot.builder().template(saladTemplate).slotName("Dressing").ingredientCategory("Fats and Oils").maxSelect(1).isRequired(false).build()
+        fishTemplate.setSlots(List.of(
+                MealSlot.builder().template(fishTemplate).slotName("Base").ingredientCategory("Cereal Grains and Pasta").maxSelect(1).isRequired(true).build(),
+                MealSlot.builder().template(fishTemplate).slotName("Veggies").ingredientCategory("Vegetables and Vegetable Products").maxSelect(4).isRequired(false).build(),
+                MealSlot.builder().template(fishTemplate).slotName("Sauce").ingredientCategory("Fats and Oils").maxSelect(2).isRequired(false).build()
         ));
 
-        mealTemplateRepository.saveAll(List.of(burgerTemplate, grillTemplate, saladTemplate));
+        // 4. Legumes Template
+        MealTemplate legumeTemplate = MealTemplate.builder()
+                .name("Custom Vegan Bowl")
+                .primaryCategory("Legumes and Legume Products")
+                .build();
         
-        log.info("MealTemplateSeeder finished. Created standard templates.");
+        legumeTemplate.setSlots(List.of(
+                MealSlot.builder().template(legumeTemplate).slotName("Base").ingredientCategory("Cereal Grains and Pasta").maxSelect(1).isRequired(true).build(),
+                MealSlot.builder().template(legumeTemplate).slotName("Veggies").ingredientCategory("Vegetables and Vegetable Products").maxSelect(4).isRequired(false).build(),
+                MealSlot.builder().template(legumeTemplate).slotName("Sauce").ingredientCategory("Fats and Oils").maxSelect(2).isRequired(false).build()
+        ));
+
+        mealTemplateRepository.saveAll(List.of(poultryTemplate, beefTemplate, fishTemplate, legumeTemplate));
+        
+        log.info("MealTemplateSeeder finished. Created USDA-aligned standard templates.");
     }
 }
